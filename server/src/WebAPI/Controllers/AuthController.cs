@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using ChessProject.Application.DTOs;
 using ChessProject.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ChessProject.WebAPI.Controllers;
@@ -37,12 +39,45 @@ public class AuthController : ControllerBase
         {
             var token = await _authService.LoginAsync(dto.Username, dto.Password);
 
-            return Ok(new { Token = token });
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = DateTime.UtcNow.AddHours(1)
+            };
+
+            Response.Cookies.Append("accessToken", token, cookieOptions);
+
+            return Ok(new { message = "Login successful" });
         }
         catch (Exception e)
         {
             Console.WriteLine(e);
             return Unauthorized(new { message = e.Message });
         }
+    }
+
+    [HttpPost("logout")] // POST api/auth/logout
+    public IActionResult Logout()
+    {
+        Response.Cookies.Delete("accessToken", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.None
+        });
+        return Ok(new { message = "Logged out" });
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public IActionResult GetMe()
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var username = User.FindFirstValue(ClaimTypes.Name);
+        var role = User.FindFirstValue(ClaimTypes.Role);
+
+        return Ok(new { id = userId, username, role });
     }
 }
