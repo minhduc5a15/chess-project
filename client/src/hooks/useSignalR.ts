@@ -6,28 +6,43 @@ export const useSignalR = (hubUrl: string) => {
     null
   );
 
+  const [isConnected, setIsConnected] = useState(false);
+
   useEffect(() => {
     const newConnection = new signalR.HubConnectionBuilder()
-      .withUrl(hubUrl, {})
+      .withUrl(hubUrl, {
+        withCredentials: true,
+      })
       .withAutomaticReconnect()
       .build();
 
     setConnection(newConnection);
-  }, [hubUrl]);
 
-  const startConnection = async () => {
-    if (
-      connection &&
-      connection.state === signalR.HubConnectionState.Disconnected
-    ) {
+    const start = async () => {
       try {
-        await connection.start();
-        console.log("SignalR Connected!");
+        if (newConnection.state === signalR.HubConnectionState.Disconnected) {
+          await newConnection.start();
+          console.log("SignalR Connected!");
+          setIsConnected(true);
+        }
       } catch (err) {
         console.error("SignalR Connection Error: ", err);
+        setIsConnected(false);
+        // Có thể thử kết nối lại sau vài giây nếu muốn
+        setTimeout(start, 5000);
       }
-    }
-  };
+    };
 
-  return { connection, startConnection };
+    newConnection.onclose(() => setIsConnected(false));
+    newConnection.onreconnecting(() => setIsConnected(false));
+    newConnection.onreconnected(() => setIsConnected(true));
+
+    start();
+
+    return () => {
+      newConnection.stop();
+    };
+  }, [hubUrl]);
+
+  return { connection, isConnected };
 };
