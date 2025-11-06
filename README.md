@@ -68,8 +68,10 @@ Không cần nhúng stockfish ban đầu, có thể implement validator riêng h
 
 - Sử dụng hệ Elo chuẩn:
 
-  - ![Elo formula](https://latex.codecogs.com/png.latex?E%20=%20\frac{1}{1+10^{\frac{R_{opponent}-R_{player}}{400}}})
-  - ![Elo rating](https://latex.codecogs.com/png.latex?R_{new}=R_{old}+K(S-E))
+  - ![Elo Expected Score](https://latex.codecogs.com/svg.latex?\color{cyan}E=\frac{1}{1+10^{\frac{R_{opponent}-R_{player}}{400}}})
+
+  - ![Elo Update](https://latex.codecogs.com/svg.latex?\color{cyan}R_{new}=R_{old}+K(S-E))
+
 
 - Chọn `K` theo mức kinh nghiệm (ví dụ 40 mới, 20 trung bình, 10 cao).
 - Gợi ý: block update elo trong transaction khi lưu ván để tránh race.
