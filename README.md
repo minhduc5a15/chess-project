@@ -72,7 +72,6 @@ Không cần nhúng stockfish ban đầu, có thể implement validator riêng h
 
   - ![Elo Update](https://latex.codecogs.com/svg.latex?\color{cyan}R_{new}=R_{old}+K(S-E))
 
-
 - Chọn `K` theo mức kinh nghiệm (ví dụ 40 mới, 20 trung bình, 10 cao).
 - Gợi ý: block update elo trong transaction khi lưu ván để tránh race.
 

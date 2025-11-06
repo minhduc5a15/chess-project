@@ -23,7 +23,7 @@ public class GamesController : ControllerBase
     {
         try
         {
-            // Lấy ID của user hiện tại từ Token (Claim "sub" mà ta đã cấu hình trong AuthService)
+            // Lấy ID của user hiện tại từ Token (Claim "sub" đã cấu hình trong AuthService)
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(userId))
             {
@@ -48,5 +48,30 @@ public class GamesController : ControllerBase
     {
         var games = await _gameService.GetWaitingGamesAsync();
         return Ok(games);
+    }
+
+    // GET api/games/{id}
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetGame(Guid id)
+    {
+        var game = await _gameService.GetGameByIdAsync(id);
+        if (game == null) return NotFound();
+        return Ok(game);
+    }
+
+    [Authorize]
+    [HttpPut("{id}/join")]
+    public async Task<IActionResult> JoinGame(Guid id)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+        if (userId == null) return Unauthorized();
+
+        var success = await _gameService.JoinGameAsync(id, userId);
+
+        if (!success)
+        {
+            return BadRequest(new { success, message = "Cannot join game (it might be full or you are the owner)." });
+        }
+        return Ok(new { message = "Joined game successfully" });
     }
 }

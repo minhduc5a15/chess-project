@@ -34,6 +34,37 @@ public class GameService : IGameService
         return games.Select(MapToDto);
     }
 
+    public async Task<GameDto?> GetGameByIdAsync(Guid gameId)
+    {
+        var game = await _gameRepository.GetByIdAsync(gameId);
+        return game == null ? null : MapToDto(game);
+    }
+
+    public async Task<bool> JoinGameAsync(Guid gameId, string playerId)
+    {
+        var game = await _gameRepository.GetByIdAsync(gameId);
+
+        if (game == null || game.Status != "WAITING" || game.WhitePlayerId == playerId)
+        {
+            return false;
+        }
+        game.BlackPlayerId = playerId;
+        game.Status = "PLAYING";
+        await _gameRepository.UpdateAsync(game);
+        return true;
+    }
+
+    public async Task UpdateGameFenAsync(Guid gameId, string newFen)
+    {
+        var game = await _gameRepository.GetByIdAsync(gameId);
+        if (game != null)
+        {
+            game.FEN = newFen;
+
+            await _gameRepository.UpdateAsync(game);
+        }
+    }
+
     // Hàm helper đơn giản để chuyển Entity -> DTO
     private static GameDto MapToDto(Game game)
     {
