@@ -1,9 +1,16 @@
 import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+} from "react-router-dom";
 import { useAuthStore } from "./stores/auth-store";
 import LoginPage from "./pages/login-page";
 import RegisterPage from "./pages/register-page";
 import LobbyPage from "./pages/lobby-page";
+import GamePage from "./pages/game-page";
 
 // Component bảo vệ route
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -39,13 +46,15 @@ function App() {
 
         {/* Route được bảo vệ */}
         <Route
-          path="/"
           element={
             <ProtectedRoute>
-              <LobbyPage />
+              <Outlet />
             </ProtectedRoute>
           }
-        />
+        >
+          <Route path="/" element={<LobbyPage />} />
+          <Route path="/game/:gameId" element={<GamePage />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );
