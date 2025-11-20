@@ -1,40 +1,74 @@
-import { useState } from "react";
-import { Chess, type Square, Move, type Piece } from "chess.js";
+import { useEffect, useState } from "react";
+import { Chess, type Square, type Piece, Move } from "chess.js";
 import BoardSquare from "./board/board-square";
 import ChessPiece from "./board/chess-piece";
 
-const ChessBoard = () => {
-  const [game, setGame] = useState(new Chess());
+// 1. Định nghĩa Props để nhận dữ liệu từ cha (GamePage)
+interface ChessBoardProps {
+  fen: string;
+  myColor: "w" | "b" | "spectator";
+  onMove: (
+    move: { from: string; to: string; promotion?: string },
+    newFen: string
+  ) => void;
+}
+
+const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
+  // Khởi tạo game từ FEN được truyền vào
+  const [game, setGame] = useState(new Chess(fen));
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [validMoves, setValidMoves] = useState<string[]>([]);
-  const [draggedSquare, setDraggedSquare] = useState<Square | null>(null);
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(
     null
   );
+  const [draggedSquare, setDraggedSquare] = useState<Square | null>(null);
 
-  const board = game.board(); // Lấy trạng thái bàn cờ 8x8 hiện tại
+  // Đồng bộ bàn cờ khi server gửi FEN mới
+  useEffect(() => {
+    if (!fen) return; // Bỏ qua nếu fen rỗng
+
+    try {
+      const newGame = new Chess(fen);
+      setGame(newGame);
+      setSelectedSquare(null);
+      setValidMoves([]);
+    } catch (e) {
+      console.error("Invalid FEN from server:", fen);
+    }
+  }, [fen]);
+
+  const board = game.board();
+
+  // Chỉ cho phép thao tác nếu đúng lượt và đúng màu quân
+  const isMyTurn = game.turn() === myColor;
 
   // --- LOGIC GAME ---
 
   function makeMove(from: Square, to: Square): boolean {
+    // Chặn nếu không phải lượt mình hoặc là khán giả
+    if (!isMyTurn) return false;
+
     try {
       const gameCopy = new Chess(game.fen());
-      const result = gameCopy.move({ from, to, promotion: "q" });
+      const moveResult = gameCopy.move({ from, to, promotion: "q" }); // Tạm thời luôn phong Hậu
 
-      if (result) {
+      if (moveResult) {
         setGame(gameCopy);
         setLastMove({ from, to });
+
+        // 3. Gửi nước đi lên GamePage (để bắn SignalR)
+        onMove({ from, to, promotion: "q" }, gameCopy.fen());
         return true;
       }
     } catch (e) {
-      console.log(e);
       return false;
     }
     return false;
   }
 
-  // Xử lý khi click vào một ô
   function handleSquareClick(square: Square) {
+    if (!isMyTurn && myColor !== "spectator") return;
+
     if (selectedSquare === square) {
       resetSelection();
       return;
@@ -48,7 +82,7 @@ const ChessBoard = () => {
     }
 
     const piece = game.get(square);
-    if (piece && piece.color === game.turn()) {
+    if (piece && piece.color === myColor) {
       setSelectedSquare(square);
       const moves = game.moves({ square, verbose: true }) as Move[];
       setValidMoves(moves.map((m) => m.to));
@@ -57,21 +91,19 @@ const ChessBoard = () => {
     }
   }
 
-  // Xử lý khi bắt đầu kéo quân
-  function handleDragStart(square: Square) {
+  function onDragStartHandler(square: Square) {
+    if (!isMyTurn) return;
     setDraggedSquare(square);
-    // Hiển thị các nước đi hợp lệ ngay khi bắt đầu kéo
     const moves = game.moves({ square, verbose: true }) as Move[];
     setValidMoves(moves.map((m) => m.to));
   }
 
-  // Xử lý khi thả quân vào một ô
-  function handleDrop(targetSquare: Square) {
+  function onDropHandler(targetSquare: Square) {
     if (draggedSquare) {
       makeMove(draggedSquare, targetSquare);
     }
-    resetSelection();
     setDraggedSquare(null);
+    resetSelection();
   }
 
   function resetSelection() {
@@ -79,21 +111,25 @@ const ChessBoard = () => {
     setValidMoves([]);
   }
 
-  const isKingInCheck = (square: Square, piece: Piece | null) => {
+  const isKingInCheck = (piece: Piece | null) => {
     return piece?.type === "k" && piece.color === game.turn() && game.inCheck();
   };
 
-  // --- RENDER ---
-
   return (
     <div className="flex flex-col items-center">
-      <div className="w-full max-w-[600px] p-4">
+      {/* Làm mờ bàn cờ nếu không phải lượt mình */}
+      <div
+        className={`w-full max-w-[600px] p-4 transition-opacity duration-300 ${
+          !isMyTurn && myColor !== "spectator" ? "opacity-90" : ""
+        }`}
+      >
         <div className="aspect-square w-full border-8 border-gray-800 rounded-sm overflow-hidden shadow-2xl bg-gray-800 grid grid-cols-8">
           {board.map((row, rowIndex) =>
             row.map((piece, colIndex) => {
-              const file = String.fromCharCode(97 + colIndex); // a, b, c...
-              const rank = 8 - rowIndex; // 8, 7, 6...
+              const file = String.fromCharCode(97 + colIndex);
+              const rank = 8 - rowIndex;
               const square = `${file}${rank}` as Square;
+              const isMyPiece = piece?.color === myColor;
 
               return (
                 <BoardSquare
@@ -103,7 +139,7 @@ const ChessBoard = () => {
                   isLastMove={
                     lastMove?.from === square || lastMove?.to === square
                   }
-                  isCheck={isKingInCheck(square, piece)}
+                  isCheck={isKingInCheck(piece)}
                   isValidMove={validMoves.includes(square)}
                   isCaptureMove={validMoves.includes(square) && !!piece}
                   showCoordinates={{
@@ -111,15 +147,15 @@ const ChessBoard = () => {
                     file: rowIndex === 7 ? file : undefined,
                   }}
                   onClick={handleSquareClick}
-                  onDrop={handleDrop}
+                  onDrop={onDropHandler}
                 >
                   {piece && (
                     <ChessPiece
                       type={piece.type}
                       color={piece.color}
                       square={square}
-                      canDrag={piece.color === game.turn()}
-                      onDragStart={handleDragStart}
+                      canDrag={isMyPiece && isMyTurn}
+                      onDragStart={onDragStartHandler}
                     />
                   )}
                 </BoardSquare>
@@ -139,6 +175,17 @@ const ChessBoard = () => {
             {game.turn() === "w" ? "TRẮNG" : "ĐEN"}
           </strong>
         </div>
+        <div className="text-sm px-3 py-1 bg-blue-900/50 rounded-full border border-blue-700">
+          Bạn:{" "}
+          <strong className="uppercase text-blue-300">
+            {myColor === "spectator"
+              ? "Xem"
+              : myColor === "w"
+              ? "Trắng"
+              : "Đen"}
+          </strong>
+        </div>
+
         {game.inCheck() && !game.isCheckmate() && (
           <div className="px-3 py-1 bg-red-600/80 rounded text-sm font-bold animate-pulse">
             CHIẾU!
@@ -146,12 +193,7 @@ const ChessBoard = () => {
         )}
         {game.isCheckmate() && (
           <div className="px-3 py-1 bg-red-600 rounded text-sm font-bold">
-            CHIẾU BÍ! {game.turn() === "w" ? "Đen" : "Trắng"} thắng
-          </div>
-        )}
-        {game.isDraw() && (
-          <div className="px-3 py-1 bg-yellow-600 rounded text-sm font-bold">
-            HÒA CỜ
+            CHIẾU BÍ!
           </div>
         )}
       </div>

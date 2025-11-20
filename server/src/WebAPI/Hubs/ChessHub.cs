@@ -26,13 +26,23 @@ public class ChessHub : Hub
     // Cập nhật: Nhận thêm FEN mới để lưu vào DB
     public async Task SendMove(string gameId, string moveUCI, string newFen)
     {
+        var userId = Context.UserIdentifier;
         // 1. Lưu trạng thái mới vào Database
-        if (Guid.TryParse(gameId, out var gId))
+        if (Guid.TryParse(gameId, out var gId) && userId != null)
         {
-            await _gameService.UpdateGameFenAsync(gId, newFen);
-        }
+            // Gọi Service để validate và thực hiện nước đi
+            bool isValid = await _gameService.MakeMoveAsync(gId, moveUCI, userId);
 
-        // 2. Gửi nước đi và FEN mới cho đối thủ để họ cập nhật bàn cờ
-        await Clients.Group(gameId).SendAsync("ReceiveMove", moveUCI, newFen);
+            if (isValid)
+            {
+                // Nếu hợp lệ, lấy Game mới nhất để gửi FEN chuẩn về cho CẢ HAI client
+                var game = await _gameService.GetGameByIdAsync(gId);
+                if (game != null)
+                {
+                    // Gửi sự kiện UpdateBoard thay vì ReceiveMove để client sync theo server
+                    await Clients.Group(gameId).SendAsync("UpdateBoard", game.FEN);
+                }
+            }
+        }
     }
 }

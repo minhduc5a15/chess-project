@@ -2,5 +2,8 @@
   "scripts": {
     "start": "cd server && dotnet run --launch-profile https --project src/WebAPI/ChessProject.WebAPI.csproj",
     "dev": "cd client && bun dev"
+  },
+  "dependencies": {
+    "": "."
   }
 }

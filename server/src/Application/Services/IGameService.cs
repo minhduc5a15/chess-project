@@ -10,4 +10,6 @@ public interface IGameService
     Task<GameDto?> GetGameByIdAsync(Guid gameId);
     Task<bool> JoinGameAsync(Guid gameId, string playerId);
     Task UpdateGameFenAsync(Guid gameId, string newFen);
+
+    Task<bool> MakeMoveAsync(Guid gameId, string moveUCI, string playerId);
 }
