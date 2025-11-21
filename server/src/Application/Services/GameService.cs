@@ -114,6 +114,22 @@ public class GameService : IGameService
         return dto;
     }
 
+    public async Task<bool> CancelGameAsync(Guid gameId, string userId)
+    {
+        var game = await _gameRepository.GetByIdAsync(gameId);
+
+        if (game == null) return false;
+
+        // Chỉ chủ phòng (WhitePlayer) mới được hủy
+        if (game.WhitePlayerId != userId) return false;
+
+        // Chỉ hủy được khi đang WAITING (nếu đang PLAYING thì phải Resign/Draw)
+        if (game.Status != "WAITING") return false;
+
+        await _gameRepository.DeleteAsync(gameId);
+        return true;
+    }
+
     public async Task<GameDto?> GetActiveGameAsync(string userId)
     {
         var game = await _gameRepository.GetActiveGameByUserIdAsync(userId);

@@ -245,7 +245,7 @@ const GamePage = ({ mockGame, mockUser }: GamePageProps = {}) => {
     id: game.blackPlayerId,
     username: game.blackPlayerId
       ? game.blackUsername || "Unknown"
-      : "Waiting...", 
+      : "Waiting...",
     timeMs: game.blackTimeRemainingMs,
     isActive: isGamePlaying && currentTurn === "b",
     color: "b" as const,
@@ -255,6 +255,16 @@ const GamePage = ({ mockGame, mockUser }: GamePageProps = {}) => {
   const topPlayer = isBoardFlipped ? whitePlayer : blackPlayer;
   const bottomPlayer = isBoardFlipped ? blackPlayer : whitePlayer;
 
+  const handleCancelGame = async () => {
+    if (!gameId) return;
+    try {
+      await gameApi.cancelGame(gameId);
+      navigate("/");
+    } catch (error) {
+      console.error("Error canceling game:", error);
+      alert("Failed to cancel game");
+    }
+  };
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col font-sans">
       <header className="h-16 px-6 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md flex items-center justify-between sticky top-0 z-50">
@@ -302,6 +312,14 @@ const GamePage = ({ mockGame, mockUser }: GamePageProps = {}) => {
             </div>
           </div>
         </div>
+        {game.status === "WAITING" && game.whitePlayerId === user.id && (
+          <button
+            onClick={handleCancelGame}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold transition-colors flex items-center gap-2 shadow-lg shadow-red-900/20"
+          >
+            🗑️ Hủy phòng
+          </button>
+        )}
 
         {isGamePlaying && myColor !== "spectator" && (
           <div className="hidden md:flex items-center gap-3">

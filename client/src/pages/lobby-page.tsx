@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuthStore } from "../stores/auth-store";
 import { useNavigate } from "react-router-dom";
 import { gameApi } from "../api/game-api";
@@ -28,11 +28,11 @@ const LobbyPage = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   // Load danh sách phòng + check trạng thái bản thân
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [gamesData, myActiveGame] = await Promise.all([
         gameApi.getGames(currentTab, page, 9),
-        gameApi.getCurrentGame(), // [MỚI] Check xem mình có đang bận không
+        gameApi.getCurrentGame(), // Check xem mình có đang bận không
       ]);
 
       setGames(gamesData.items);
@@ -41,7 +41,7 @@ const LobbyPage = () => {
     } catch (error) {
       console.error("Lỗi tải dữ liệu:", error);
     }
-  };
+  }, [currentTab, page]);
 
   const handleTabChange = (val: string) => {
     setCurrentTab(val as GameStatus);
@@ -53,7 +53,7 @@ const LobbyPage = () => {
     loadData();
     const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
-  }, [currentTab, page]);
+  }, [loadData]);
 
   const handleCreateGame = async () => {
     // [LOGIC MỚI] Chặn ở client
@@ -90,7 +90,7 @@ const LobbyPage = () => {
       return;
     }
 
-    // [LOGIC MỚI] Nếu mình đang bận (activeGame khác null) và định vào phòng khác -> Chặn
+    // Nếu mình đang bận (activeGame khác null) và định vào phòng khác -> Chặn
     if (activeGame) {
       alert(
         "Bạn đang trong một ván đấu khác. Không thể tham gia thêm phòng mới."
@@ -112,7 +112,6 @@ const LobbyPage = () => {
     }
   };
 
-  // ... (renderGameResult giữ nguyên)
   const renderGameResult = (game: Game) => {
     if (game.status !== "FINISHED") return null;
     if (!game.winnerId)
@@ -120,6 +119,22 @@ const LobbyPage = () => {
     if (game.winnerId === game.whitePlayerId)
       return <span className="text-green-400 font-bold">🏆 Trắng thắng</span>;
     return <span className="text-red-400 font-bold">🏆 Đen thắng</span>;
+  };
+
+  const handleCancelActiveGame = async () => {
+    if (!activeGame) return;
+    if (!window.confirm("Bạn chắc chắn muốn hủy phòng này?")) return;
+
+    try {
+      await gameApi.cancelGame(activeGame.id);
+      setActiveGame(null); // Xóa trạng thái bận
+      loadData(); // Tải lại danh sách
+      alert("Đã hủy phòng thành công!");
+    } catch (error) {
+      alert(
+        "Không thể hủy phòng (có thể ván đấu đã bắt đầu). Hãy vào phòng để kiểm tra."
+      );
+    }
   };
 
   const getButtonConfig = (game: Game) => {
@@ -142,7 +157,7 @@ const LobbyPage = () => {
       };
     }
 
-    // [LOGIC MỚI] Nếu mình đang bận ở phòng khác -> Disable nút tham gia
+    // Nếu mình đang bận ở phòng khác -> Disable nút tham gia
     if (activeGame) {
       return {
         text: "Bạn đang bận 🚫",
@@ -230,6 +245,15 @@ const LobbyPage = () => {
               ⚠️ Bạn đang có một ván đấu chưa kết thúc (Phòng #
               {activeGame.id.substring(0, 4)}).
             </span>
+            {activeGame.status === "WAITING" &&
+              activeGame.whitePlayerId === user?.id && (
+                <button
+                  onClick={handleCancelActiveGame}
+                  className="px-4 py-1.5 bg-red-600/80 hover:bg-red-600 text-white rounded font-bold text-sm transition-colors"
+                >
+                  Hủy phòng
+                </button>
+              )}
             <button
               onClick={() => navigate(`/game/${activeGame.id}`)}
               className="px-4 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white rounded font-bold text-sm transition-colors"

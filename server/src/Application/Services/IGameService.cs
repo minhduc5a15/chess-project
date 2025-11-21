@@ -18,4 +18,6 @@ public interface IGameService
     Task<PaginatedResult<GameDto>> GetUserGamesAsync(string userId, string status, int page, int pageSize);
 
     Task<GameDto?> GetActiveGameAsync(string userId);
+
+    Task<bool> CancelGameAsync(Guid gameId, string userId);
 }

@@ -132,4 +132,21 @@ public class GamesController : ControllerBase
         var messages = await _chatRepository.GetMessagesByGameIdAsync(id);
         return Ok(messages);
     }
+    [Authorize]
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> CancelGame(Guid id)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+        if (userId == null) return Unauthorized();
+
+        var success = await _gameService.CancelGameAsync(id, userId);
+
+        if (!success)
+        {
+            return BadRequest(new
+                { message = "Cannot cancel game. Either you are not the owner or the game has started." });
+        }
+
+        return Ok(new { message = "Game cancelled successfully" });
+    }
 }

@@ -46,6 +46,11 @@ export const gameApi = {
     return response.data;
   },
 
+  // Hủy phòng
+  cancelGame: async (gameId: string): Promise<void> => {
+    await apiClient.delete(`/games/${gameId}`);
+  },
+
   // Tham gia vào một phòng
   joinGame: async (gameId: string): Promise<void> => {
     await apiClient.put(`/games/${gameId}/join`);
