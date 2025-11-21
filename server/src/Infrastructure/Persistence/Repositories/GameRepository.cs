@@ -47,10 +47,16 @@ public class GameRepository : IGameRepository
         await _context.SaveChangesAsync();
     }
 
-    public async Task<IEnumerable<Game>> GetGamesByStatusAsync(string status, int page, int pageSize)
+    public async Task<IEnumerable<Game>> GetGamesByStatusAsync(int page = 1, int pageSize = 10, string? status = "WAITING")
     {
-        return await _context.Games
-            .Where(g => g.Status == status)
+        var query = _context.Games.AsQueryable();
+
+        if (!string.IsNullOrEmpty(status))
+        {
+            query = query.Where(g => g.Status == status);
+        }
+
+        return await query
             .OrderByDescending(g => g.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)

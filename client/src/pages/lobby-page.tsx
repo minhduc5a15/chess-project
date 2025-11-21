@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuthStore } from "../stores/auth-store";
 import { useNavigate } from "react-router-dom";
 import { gameApi } from "../api/game-api";
@@ -10,7 +10,7 @@ const LobbyPage = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [games, setGames] = useState<Game[]>([]);
-  const [statusFilter, setStatusFilter] = useState<"WAITING" | "PLAYING" | "FINISHED">("WAITING");
+  const [statusFilter, setStatusFilter] = useState<string | null>("WAITING");
   const [page, setPage] = useState(1);
   const pageSize = 6;
   const [myWaitingGame, setMyWaitingGame] = useState<Game | null>(null);
@@ -18,17 +18,19 @@ const LobbyPage = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [inviteTarget, setInviteTarget] = useState("");
 
-  const { connection } = useSignalR(`${window.location.origin}/hub/chess`);
+  const { connection, isConnected } = useSignalR(`${window.location.origin}/hub/chess`);
 
-  const loadGames = async (status: string = statusFilter, pageIndex: number = page) => {
+  const loadGames = useCallback(async (pageIndex = page, status = statusFilter) => {
+    setIsLoading(true);
     try {
-      const data = await gameApi.getGames(status, pageIndex, pageSize);
-      // Server returns a page of games for the given status
+      const data = await gameApi.getGamesByStatus(pageIndex, pageSize, status);
       setGames(data);
     } catch (error) {
       console.error("Lỗi tải danh sách phòng:", error);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [pageSize]);
 
   const loadMyWaiting = async () => {
     try {
@@ -44,6 +46,7 @@ const LobbyPage = () => {
   }, [user])
 
   useEffect(() => {
+    // initial load
     loadGames();
     loadMyWaiting();
     const interval = setInterval(() => {
@@ -55,8 +58,8 @@ const LobbyPage = () => {
 
   // Reload when status or page changes
   useEffect(() => {
-    loadGames(statusFilter, page);
-  }, [statusFilter, page]);
+    loadGames(page, statusFilter);
+  }, [loadGames, page, statusFilter]);
 
   const handleCreateGame = async () => {
     setIsLoading(true);
@@ -144,23 +147,64 @@ const LobbyPage = () => {
       alert("Nhập username người chơi cần mời");
       return;
     }
+    if (!connection || !isConnected) {
+      alert("Kết nối realtime chưa sẵn sàng. Vui lòng thử lại sau.");
+      return;
+    }
+
+    // Prevent inviting self
+    if (inviteTarget.trim() === user?.username) {
+      alert("Bạn không thể mời chính mình.");
+      return;
+    }
 
     try {
-      // Resolve username -> userId
-      const target = await (await import("../api/user-api")).userApi.getByUsername(inviteTarget);
-      if (!target) {
-        alert("Không tìm thấy user với username này");
-        return;
-      }
-
-      await connection?.invoke("InvitePlayer", myWaitingGame.id, target.id, user?.username ?? "Unknown");
-      alert("Lời mời đã được gửi");
-      setInviteTarget("");
+      await connection.invoke("InvitePlayer", myWaitingGame.id, inviteTarget.trim());
+      // Server will emit InviteSent or InviteFailed
     } catch (err) {
       console.error(err);
       alert("Không thể gửi lời mời");
     }
   };
+
+  // Register SignalR handlers
+  useEffect(() => {
+    if (!connection || !isConnected || !user) return;
+
+    const handleReceiveInvite = (invite: { gameId: string; inviter: string; gameStatus: string }) => {
+      alert(`Bạn nhận được lời mời tham gia phòng ${invite.gameId.substring(0, 4)} từ ${invite.inviter}!`);
+      // Reload lists so user can see the room
+      loadGames();
+      loadMyWaiting();
+    };
+
+    const handleInviteSent = (invitedUsername: string) => {
+      alert(`Lời mời đã gửi đến ${invitedUsername}`);
+      setInviteTarget("");
+    };
+
+    const handleInviteFailed = (message: string) => {
+      alert(`Lỗi gửi lời mời: ${message}`);
+    };
+
+    const handleUpdateBoard = () => {
+      // Someone joined or the game state changed; refresh
+      loadGames();
+      loadMyWaiting();
+    };
+
+    connection.on("ReceiveInvite", handleReceiveInvite);
+    connection.on("InviteSent", handleInviteSent);
+    connection.on("InviteFailed", handleInviteFailed);
+    connection.on("UpdateBoard", handleUpdateBoard);
+
+    return () => {
+      connection.off("ReceiveInvite", handleReceiveInvite);
+      connection.off("InviteSent", handleInviteSent);
+      connection.off("InviteFailed", handleInviteFailed);
+      connection.off("UpdateBoard", handleUpdateBoard);
+    };
+  }, [connection, isConnected, user]);
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
@@ -251,6 +295,7 @@ const LobbyPage = () => {
         {/* Danh sách phòng (Tabs by status + pagination) */}
         <div className="mb-4 flex items-center gap-4">
           <div className="flex gap-2">
+            <button onClick={() => { setStatusFilter(null); setPage(1); }} className={`px-3 py-1 rounded ${statusFilter === null ? "bg-blue-600" : "bg-gray-800"}`}>All</button>
             <button onClick={() => { setStatusFilter("WAITING"); setPage(1); }} className={`px-3 py-1 rounded ${statusFilter === "WAITING" ? "bg-blue-600" : "bg-gray-800"}`}>Waiting</button>
             <button onClick={() => { setStatusFilter("PLAYING"); setPage(1); }} className={`px-3 py-1 rounded ${statusFilter === "PLAYING" ? "bg-blue-600" : "bg-gray-800"}`}>Playing</button>
             <button onClick={() => { setStatusFilter("FINISHED"); setPage(1); }} className={`px-3 py-1 rounded ${statusFilter === "FINISHED" ? "bg-blue-600" : "bg-gray-800"}`}>Finished</button>

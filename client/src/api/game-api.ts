@@ -10,8 +10,11 @@ export const gameApi = {
   },
 
   // Lấy games theo trạng thái, hỗ trợ phân trang
-  getGames: async (status: string, page = 1, pageSize = 10): Promise<Game[]> => {
-    const response = await apiClient.get(`/games?status=${encodeURIComponent(status)}&page=${page}&pageSize=${pageSize}`);
+  getGamesByStatus: async (page = 1, pageSize = 10, status?: string | null): Promise<Game[]> => {
+    const params: Record<string, any> = { page, pageSize };
+    if (status) params.status = status;
+
+    const response = await apiClient.get(`/games`, { params });
     return response.data;
   },
 

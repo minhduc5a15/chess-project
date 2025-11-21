@@ -105,24 +105,44 @@ public class ChessHub : Hub
         });
     }
 
-    public async Task InvitePlayer(string gameId, string invitedPlayerId, string inviterUsername)
+    public async Task InvitePlayer(string gameId, string invitedUsername)
     {
+        var callerUserId = Context.UserIdentifier;
+        if (string.IsNullOrEmpty(callerUserId)) return;
+
         if (!Guid.TryParse(gameId, out var gId)) return;
+
+        // Lấy thông tin người mời từ DB
+        var inviter = await _userRepository.GetByIdAsync(Guid.Parse(callerUserId));
+        if (inviter == null) return;
+
+        // Lấy người được mời theo username
+        var invitedUser = await _userRepository.GetByUsernameAsync(invitedUsername);
+        if (invitedUser == null)
+        {
+            await Clients.Caller.SendAsync("InviteFailed", $"Không tìm thấy người dùng {invitedUsername}");
+            return;
+        }
 
         var game = await _gameService.GetGameByIdAsync(gId);
         if (game == null || game.Status != "WAITING") return;
 
-        // Gửi invite tới group/đương kết nối của user được mời
-        // Dùng Group có tên là invitedPlayerId (được thêm khi user connect)
-        await Clients.Group(invitedPlayerId).SendAsync("ReceiveInvite", new
+        // Chỉ người tạo phòng (WhitePlayerId) mới có quyền mời
+        if (game.WhitePlayerId != callerUserId)
+        {
+            await Clients.Caller.SendAsync("InviteFailed", "Bạn không có quyền mời người chơi trong phòng này.");
+            return;
+        }
+
+        // Gửi invite tới group có tên là invited user's id
+        await Clients.Group(invitedUser.Id.ToString()).SendAsync("ReceiveInvite", new
         {
             gameId = gameId,
-            inviter = inviterUsername,
+            inviter = inviter.Username,
             gameStatus = game.Status
         });
 
-        // Thông báo cho người gửi là invite đã được gửi
-        await Clients.Caller.SendAsync("InviteSent", gameId);
+        await Clients.Caller.SendAsync("InviteSent", invitedUsername);
     }
 
     public async Task Resign(string gameId)

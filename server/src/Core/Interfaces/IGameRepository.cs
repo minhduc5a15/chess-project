@@ -9,7 +9,7 @@ public interface IGameRepository
     Task<IEnumerable<Game>> GetWaitingGamesAsync();
     Task<Game?> GetWaitingGameByCreatorIdAsync(string playerId);
     Task DeleteAsync(Guid id);
-    Task<IEnumerable<Game>> GetGamesByStatusAsync(string status, int page, int pageSize);
+    Task<IEnumerable<Game>> GetGamesByStatusAsync(int page = 1, int pageSize = 10, string? status = "WAITING");
     Task<IEnumerable<Game>> GetGamesByUserAsync(Guid userId, int page, int pageSize);
     Task UpdateAsync(Game game);
 }

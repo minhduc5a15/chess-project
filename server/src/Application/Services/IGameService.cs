@@ -9,8 +9,8 @@ public interface IGameService
 
     Task<GameDto?> GetGameByIdAsync(Guid gameId);
     Task<GameDto?> GetWaitingGameByCreatorIdAsync(string playerId);
-    Task DeleteGameAsync(Guid id);
-    Task<IEnumerable<GameDto>> GetGamesByStatusAsync(string status, int page, int pageSize);
+    Task<bool> DeleteGameAsync(Guid id, string playerId);
+    Task<IEnumerable<GameDto>> GetGamesByStatusAsync(int page = 1, int pageSize = 10, string? status = "WAITING");
     Task<IEnumerable<GameDto>> GetGamesByUserAsync(string userId, int page, int pageSize);
     Task<bool> JoinGameAsync(Guid gameId, string playerId);
 

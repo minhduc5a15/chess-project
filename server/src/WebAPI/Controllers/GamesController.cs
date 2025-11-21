@@ -98,27 +98,18 @@ public class GamesController : ControllerBase
         return Ok(enriched);
     }
 
-    // GET api/games?status=WAITING|PLAYING|FINISHED&page=1&pageSize=10
+    // GET api/games?page=1&pageSize=10&status=WAITING|PLAYING|FINISHED
     [HttpGet]
-    public async Task<IActionResult> GetGames([FromQuery] string? status, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<IActionResult> GetGames(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? status = "WAITING")
     {
         status = status?.ToUpper() ?? "WAITING";
 
-        if (status == "FINISHED")
-        {
-            // For finished games, return games played by current user (history)
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
-            if (userId == null) return Unauthorized(new { message = "Authentication required to view finished games." });
-
-            var games = await _gameService.GetGamesByUserAsync(userId, page, pageSize);
-            var enriched = await EnrichWithUsernames(games);
-            return Ok(enriched);
-        }
-
-        // WAITING or PLAYING
-        var gamesByStatus = await _gameService.GetGamesByStatusAsync(status, page, pageSize);
-        var enrichedStatus = await EnrichWithUsernames(gamesByStatus);
-        return Ok(enrichedStatus);
+        var games = await _gameService.GetGamesByStatusAsync(page, pageSize, status);
+        var enriched = await EnrichWithUsernames(games);
+        return Ok(enriched);
     }
 
     // GET api/games/{id}
@@ -158,23 +149,12 @@ public class GamesController : ControllerBase
         }
 
 
-        // Strict owner check: compare GUIDs if possible, fallback to string compare
-        var isOwner = false;
-        if (!string.IsNullOrEmpty(game.WhitePlayerId) && Guid.TryParse(game.WhitePlayerId, out var creatorGuid) && Guid.TryParse(userId, out var callerGuid))
+        // Delegate ownership/validation to service layer for security
+        var success = await _gameService.DeleteGameAsync(id, userId);
+        if (!success)
         {
-            isOwner = creatorGuid == callerGuid;
+            return BadRequest(new { message = "Không thể hủy phòng. Vui lòng kiểm tra trạng thái phòng hoặc quyền hạn." });
         }
-        else
-        {
-            isOwner = game.WhitePlayerId == userId;
-        }
-
-        if (!isOwner)
-        {
-            return Forbid();
-        }
-
-        await _gameService.DeleteGameAsync(id);
 
         return Ok(new { message = "Game cancelled successfully" });
     }

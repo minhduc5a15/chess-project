@@ -42,15 +42,24 @@ public class GameService : IGameService
         return game == null ? null : MapToDto(game);
     }
 
-    public async Task DeleteGameAsync(Guid id)
+    public async Task<bool> DeleteGameAsync(Guid gameId, string playerId)
     {
-        // Permanently delete the game record
-        await _gameRepository.DeleteAsync(id);
+        var game = await _gameRepository.GetByIdAsync(gameId);
+        if (game == null || game.Status != "WAITING") return false;
+
+        // Only the creator (WhitePlayerId) can cancel the waiting game
+        if (string.IsNullOrEmpty(game.WhitePlayerId) || game.WhitePlayerId != playerId)
+        {
+            return false;
+        }
+
+        await _gameRepository.DeleteAsync(gameId);
+        return true;
     }
 
-    public async Task<IEnumerable<GameDto>> GetGamesByStatusAsync(string status, int page, int pageSize)
+    public async Task<IEnumerable<GameDto>> GetGamesByStatusAsync(int page = 1, int pageSize = 10, string? status = "WAITING")
     {
-        var games = await _gameRepository.GetGamesByStatusAsync(status, page, pageSize);
+        var games = await _gameRepository.GetGamesByStatusAsync(page, pageSize, status);
         return games.Select(MapToDto);
     }
 
