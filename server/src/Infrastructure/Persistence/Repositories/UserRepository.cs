@@ -36,6 +36,13 @@ public class UserRepository : IUserRepository
         return await _context.Users.OrderByDescending(u => u.CreatedAt).ToListAsync();
     }
 
+    public async Task<IEnumerable<User>> GetUsersByIdsAsync(IEnumerable<Guid> ids)
+    {
+        return await _context.Users
+            .Where(u => ids.Contains(u.Id))
+            .ToListAsync();
+    }
+
     public async Task UpdateAsync(User user)
     {
         _context.Users.Update(user);

@@ -8,6 +8,10 @@ export interface Game {
 
   whiteTimeRemainingMs: number;
   blackTimeRemainingMs: number;
+
+  whiteUsername?: string;
+  blackUsername?: string;
+
   lastMoveAt: string | null;
 
   winnerId: string | null;
@@ -15,3 +19,10 @@ export interface Game {
   moveHistory: string;
 }
 
+export interface PaginatedResult<T> {
+  items: T[];
+  totalCount: number;
+  pageIndex: number;
+  pageSize: number;
+  totalPages: number;
+}

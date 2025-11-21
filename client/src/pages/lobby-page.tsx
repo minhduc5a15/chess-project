@@ -4,71 +4,188 @@ import { useNavigate } from "react-router-dom";
 import { gameApi } from "../api/game-api";
 import type { Game } from "../types/game";
 import ProfileModal from "../components/profile-modal";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "../components/ui/tabs";
+import Pagination from "../components/ui/pagination";
+
+type GameStatus = "WAITING" | "PLAYING" | "FINISHED";
 
 const LobbyPage = () => {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+
   const [games, setGames] = useState<Game[]>([]);
+  const [activeGame, setActiveGame] = useState<Game | null>(null); // [MỚI] State lưu game đang chơi của mình
   const [isLoading, setIsLoading] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
-  const loadGames = async () => {
+  const [currentTab, setCurrentTab] = useState<GameStatus>("WAITING");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  // Load danh sách phòng + check trạng thái bản thân
+  const loadData = async () => {
     try {
-      const data = await gameApi.getWaitingGames();
-      setGames(data);
+      const [gamesData, myActiveGame] = await Promise.all([
+        gameApi.getGames(currentTab, page, 9),
+        gameApi.getCurrentGame(), // [MỚI] Check xem mình có đang bận không
+      ]);
+
+      setGames(gamesData.items);
+      setTotalPages(gamesData.totalPages);
+      setActiveGame(myActiveGame);
     } catch (error) {
-      console.error("Lỗi tải danh sách phòng:", error);
+      console.error("Lỗi tải dữ liệu:", error);
     }
   };
 
-  useEffect(() => {
-    console.log(user);
-  }, [user])
+  const handleTabChange = (val: string) => {
+    setCurrentTab(val as GameStatus);
+    setPage(1);
+    setGames([]);
+  };
 
   useEffect(() => {
-    loadGames();
-    const interval = setInterval(loadGames, 5000);
+    loadData();
+    const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [currentTab, page]);
 
   const handleCreateGame = async () => {
+    // [LOGIC MỚI] Chặn ở client
+    if (activeGame) {
+      alert(
+        `Bạn đang có phòng chưa kết thúc (${activeGame.id.substring(
+          0,
+          4
+        )}). Hãy hoàn thành nó trước!`
+      );
+      return;
+    }
+
     setIsLoading(true);
     try {
       const newGame = await gameApi.createGame();
       navigate(`/game/${newGame.id}`);
-    } catch (error) {
-      alert("Lỗi tạo phòng!");
+    } catch (error: any) {
+      alert(error.response?.data?.message || "Lỗi tạo phòng!");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleJoinGame = async (gameId: string) => {
+  const handleEnterRoom = async (game: Game) => {
+    if (game.status === "FINISHED") {
+      navigate(`/game/${game.id}`);
+      return;
+    }
+
+    // Nếu là người trong cuộc -> Vào lại
+    if (game.whitePlayerId === user?.id || game.blackPlayerId === user?.id) {
+      navigate(`/game/${game.id}`);
+      return;
+    }
+
+    // [LOGIC MỚI] Nếu mình đang bận (activeGame khác null) và định vào phòng khác -> Chặn
+    if (activeGame) {
+      alert(
+        "Bạn đang trong một ván đấu khác. Không thể tham gia thêm phòng mới."
+      );
+      return;
+    }
+
+    if (game.status === "PLAYING") {
+      alert("Phòng đang diễn ra.");
+      return;
+    }
+
     try {
-      await gameApi.joinGame(gameId);
-      navigate(`/game/${gameId}`);
+      await gameApi.joinGame(game.id);
+      navigate(`/game/${game.id}`);
     } catch (error) {
-      alert("Không thể vào phòng");
-      loadGames();
+      alert("Không thể vào phòng.");
+      loadData();
     }
   };
 
+  // ... (renderGameResult giữ nguyên)
+  const renderGameResult = (game: Game) => {
+    if (game.status !== "FINISHED") return null;
+    if (!game.winnerId)
+      return <span className="text-yellow-500 font-bold">🤝 Hòa cờ</span>;
+    if (game.winnerId === game.whitePlayerId)
+      return <span className="text-green-400 font-bold">🏆 Trắng thắng</span>;
+    return <span className="text-red-400 font-bold">🏆 Đen thắng</span>;
+  };
+
+  const getButtonConfig = (game: Game) => {
+    const isParticipant =
+      game.whitePlayerId === user?.id || game.blackPlayerId === user?.id;
+
+    if (game.status === "FINISHED") {
+      return {
+        text: "Xem kết quả 👁️",
+        disabled: false,
+        style: "bg-gray-700 hover:bg-gray-600 text-gray-200",
+      };
+    }
+
+    if (isParticipant) {
+      return {
+        text: "Vào lại phòng ↩️",
+        disabled: false,
+        style: "bg-blue-600 hover:bg-blue-500 text-white animate-pulse",
+      };
+    }
+
+    // [LOGIC MỚI] Nếu mình đang bận ở phòng khác -> Disable nút tham gia
+    if (activeGame) {
+      return {
+        text: "Bạn đang bận 🚫",
+        disabled: true,
+        style: "bg-gray-800 text-gray-500 cursor-not-allowed opacity-50",
+      };
+    }
+
+    if (game.status === "PLAYING") {
+      return {
+        text: "Đang diễn ra 🚫",
+        disabled: true,
+        style: "bg-slate-800 text-slate-500 cursor-not-allowed",
+      };
+    }
+
+    return {
+      text: "Tham gia ngay ⚔️",
+      disabled: false,
+      style:
+        "bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20",
+    };
+  };
+
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gray-950 text-white font-sans">
       {/* Header */}
-      <header className="flex justify-between items-center p-4 border-b border-gray-800 bg-gray-900 px-8">
+      <header className="flex justify-between items-center p-4 border-b border-gray-800 bg-gray-900/80 backdrop-blur px-8 sticky top-0 z-50">
         <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-green-400">
           Chess Online ♟️
         </h1>
-
-        <div className="flex items-center gap-6">
-          {/* User Info Clickable */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate("/my-games")}
+            className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-sm font-medium transition cursor-pointer hidden sm:block"
+          >
+            Lịch sử đấu
+          </button>
           <button
             onClick={() => user && navigate(`/user/${user.username}`)}
             className="flex items-center gap-3 hover:bg-gray-800 p-2 rounded-lg transition cursor-pointer"
           >
             <div className="w-9 h-9 rounded-full bg-gray-700 overflow-hidden border border-gray-500">
-              {/* Hiển thị Avatar nếu có */}
               {user?.avatarUrl ? (
                 <img
                   src={user.avatarUrl}
@@ -81,36 +198,48 @@ const LobbyPage = () => {
                 </div>
               )}
             </div>
-            <div className="text-left">
+            <div className="text-left hidden sm:block">
               <div className="text-sm font-bold text-white">
                 {user?.username}
               </div>
               <div className="text-xs text-gray-400">{user?.role}</div>
             </div>
           </button>
-
-          {/* Admin Button */}
           {user?.role === "Admin" && (
             <button
               onClick={() => navigate("/admin")}
-              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 rounded text-sm font-bold shadow-lg shadow-purple-900/50 transition cursor-pointer"
+              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 rounded text-sm font-bold shadow-lg transition cursor-pointer"
             >
-              Admin Panel
+              Admin
             </button>
           )}
-
           <button
             onClick={() => logout()}
             className="px-3 py-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded text-sm font-medium transition cursor-pointer"
           >
-            Đăng xuất
+            Thoát
           </button>
         </div>
       </header>
 
-      {/* Main Content (Giữ nguyên logic cũ) */}
-      <main className="container mx-auto p-6 max-w-5xl mt-6">
-        <div className="flex justify-between items-end mb-8 border-b border-gray-800 pb-4">
+      <main className="container mx-auto p-4 sm:p-6 max-w-6xl mt-4">
+        {/* Alert nếu đang có active game */}
+        {activeGame && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-200 p-4 rounded-lg mb-6 flex justify-between items-center animate-in slide-in-from-top-2">
+            <span>
+              ⚠️ Bạn đang có một ván đấu chưa kết thúc (Phòng #
+              {activeGame.id.substring(0, 4)}).
+            </span>
+            <button
+              onClick={() => navigate(`/game/${activeGame.id}`)}
+              className="px-4 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white rounded font-bold text-sm transition-colors"
+            >
+              Quay lại ngay
+            </button>
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center mb-6 gap-4 border-b border-gray-800 pb-4">
           <div>
             <h2 className="text-3xl font-bold text-white">Sảnh chờ</h2>
             <p className="text-gray-500 mt-1">
@@ -119,11 +248,13 @@ const LobbyPage = () => {
           </div>
           <button
             onClick={handleCreateGame}
-            disabled={isLoading}
-            className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold text-white shadow-lg shadow-green-900/50 transition-transform active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-2"
+            disabled={isLoading || !!activeGame} // [MỚI] Disable nếu đang có activeGame
+            className="w-full sm:w-auto px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg font-bold text-white shadow-lg shadow-green-900/50 transition-all active:scale-95 flex items-center justify-center gap-2"
           >
             {isLoading ? (
-              "Đang tạo..."
+              "Đang xử lý..."
+            ) : activeGame ? (
+              "Đang bận"
             ) : (
               <>
                 <span className="text-xl">+</span> Tạo phòng mới
@@ -132,51 +263,137 @@ const LobbyPage = () => {
           </button>
         </div>
 
-        {/* Danh sách phòng */}
-        {games.length === 0 ? (
-          <div className="text-center py-16 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800">
-            <div className="text-6xl mb-4 opacity-20">♟️</div>
-            <p className="text-gray-500 text-lg">Chưa có phòng nào được tạo.</p>
-            <p className="text-gray-600 text-sm">Hãy là người đầu tiên!</p>
-          </div>
-        ) : (
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {games.map((game) => (
-              <div
-                key={game.id}
-                className="group bg-gray-900 border border-gray-800 p-5 rounded-xl hover:border-gray-600 hover:shadow-xl hover:shadow-blue-900/10 transition-all duration-300 relative overflow-hidden"
-              >
-                <div className="absolute top-0 left-0 w-1 h-full bg-blue-600"></div>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <div className="font-mono text-xs text-blue-400 mb-1">
-                      ROOM #{game.id.substring(0, 4)}
-                    </div>
-                    <div className="font-bold text-lg text-white">
-                      {game.whitePlayerId ? "VS Quân Trắng" : "VS Quân Đen"}
-                    </div>
-                  </div>
-                  <div className="px-2 py-1 bg-green-900/30 text-green-400 text-xs rounded font-bold border border-green-900">
-                    WAITING
-                  </div>
-                </div>
+        <Tabs
+          value={currentTab}
+          onValueChange={handleTabChange}
+          className="w-full"
+        >
+          <TabsList className="bg-gray-900 border border-gray-800 mb-6 w-full sm:w-auto inline-flex">
+            <TabsTrigger
+              value="WAITING"
+              className="flex-1 sm:flex-none px-6 data-[state=active]:bg-gray-800 data-[state=active]:text-green-400 transition-all"
+            >
+              Đang chờ
+            </TabsTrigger>
+            <TabsTrigger
+              value="PLAYING"
+              className="flex-1 sm:flex-none px-6 data-[state=active]:bg-gray-800 data-[state=active]:text-blue-400 transition-all"
+            >
+              Đang chơi
+            </TabsTrigger>
+            <TabsTrigger
+              value="FINISHED"
+              className="flex-1 sm:flex-none px-6 data-[state=active]:bg-gray-800 data-[state=active]:text-gray-400 transition-all"
+            >
+              Lịch sử
+            </TabsTrigger>
+          </TabsList>
 
-                <button
-                  onClick={() => handleJoinGame(game.id)}
-                  disabled={game.whitePlayerId === user?.id}
-                  className="w-full py-2.5 bg-gray-800 hover:bg-blue-600 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-gray-300 hover:text-white"
-                >
-                  {game.whitePlayerId === user?.id
-                    ? "Đang chờ đối thủ..."
-                    : "Vào chơi ngay →"}
-                </button>
+          <TabsContent value={currentTab} className="mt-0 min-h-[300px]">
+            {games.length === 0 ? (
+              <div className="text-center py-20 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800">
+                <div className="text-6xl mb-4 opacity-20">♟️</div>
+                <p className="text-gray-500 text-lg">
+                  Không tìm thấy phòng nào.
+                </p>
               </div>
-            ))}
-          </div>
-        )}
-      </main>
+            ) : (
+              <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {games.map((game) => {
+                  const btnConfig = getButtonConfig(game);
+                  return (
+                    <div
+                      key={game.id}
+                      className="group bg-gray-900 border border-gray-800 p-5 rounded-xl hover:border-gray-600 hover:shadow-xl transition-all duration-300 relative overflow-hidden flex flex-col"
+                    >
+                      <div
+                        className={`absolute top-0 left-0 w-1 h-full transition-colors duration-300 ${
+                          currentTab === "PLAYING"
+                            ? "bg-blue-500"
+                            : currentTab === "FINISHED"
+                            ? "bg-gray-600"
+                            : "bg-green-500"
+                        }`}
+                      ></div>
 
-      {/* Profile Modal */}
+                      <div className="mb-4 pl-2">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="font-mono text-xs text-blue-400 bg-blue-900/20 px-2 py-0.5 rounded">
+                            #{game.id.substring(0, 8)}
+                          </div>
+                          {currentTab === "FINISHED" && (
+                            <div className="text-xs">
+                              {renderGameResult(game)}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="space-y-2 mt-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-gray-200 border border-gray-400"></div>
+                              <span
+                                className={
+                                  game.whiteUsername
+                                    ? "text-white font-medium"
+                                    : "text-gray-500 italic"
+                                }
+                              >
+                                {game.whiteUsername || "Trống"}
+                              </span>
+                            </div>
+                            {currentTab !== "FINISHED" &&
+                              !game.whiteUsername && (
+                                <span className="text-[10px] text-green-500">
+                                  Còn trống
+                                </span>
+                              )}
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-black border border-gray-600"></div>
+                              <span
+                                className={
+                                  game.blackUsername
+                                    ? "text-white font-medium"
+                                    : "text-gray-500 italic"
+                                }
+                              >
+                                {game.blackUsername || "Trống"}
+                              </span>
+                            </div>
+                            {currentTab !== "FINISHED" &&
+                              !game.blackUsername && (
+                                <span className="text-[10px] text-green-500">
+                                  Còn trống
+                                </span>
+                              )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-auto pl-2 pt-2 border-t border-gray-800/50">
+                        <button
+                          onClick={() => handleEnterRoom(game)}
+                          disabled={btnConfig.disabled}
+                          className={`w-full py-2.5 rounded-lg text-sm font-bold transition-all duration-200 ${btnConfig.style}`}
+                        >
+                          {btnConfig.text}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
+          </TabsContent>
+        </Tabs>
+      </main>
       <ProfileModal
         isOpen={showProfile}
         onClose={() => setShowProfile(false)}
