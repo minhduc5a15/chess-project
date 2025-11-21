@@ -25,7 +25,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp",
         policy => policy
-            .WithOrigins("https://localhost:5173")
+            .WithOrigins("https://localhost:5173", "https://f5b186d67f26.ngrok-free.app")
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials());
