@@ -64,6 +64,7 @@ public class GamesController : ControllerBase
     }
 
     // POST api/games (Tạo phòng)
+<<<<<<< HEAD
     public class CreateGameRequest
     {
         public int InitialMinutes { get; set; } = 10;
@@ -71,31 +72,53 @@ public class GamesController : ControllerBase
     }
 
     [Authorize] // Bắt buộc phải có Token hợp lệ
+=======
+    [Authorize]
+>>>>>>> 3efbb6bcef957fb04fcd970e30cda3a5f228393d
     [HttpPost]
     public async Task<IActionResult> CreateGame([FromBody] CreateGameRequest? request)
     {
         try
         {
-            // Lấy ID của user hiện tại từ Token (Claim "sub" đã cấu hình trong AuthService)
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userId))
-            {
-                // Fallback nếu ClaimTypes.NameIdentifier không hoạt động, thử tìm theo "sub" hoặc tên claim bạn đã dùng
-                userId = User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            }
-
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
             if (userId == null) return Unauthorized();
 
+<<<<<<< HEAD
             var minutes = request?.InitialMinutes ?? 10;
             var increment = request?.IncrementSeconds ?? 0;
 
             var game = await _gameService.CreateGameAsync(userId, minutes, increment);
+=======
+            // Service sẽ throw exception nếu đang có game active
+            var game = await _gameService.CreateGameAsync(userId);
+>>>>>>> 3efbb6bcef957fb04fcd970e30cda3a5f228393d
             return Ok(game);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Trả về 400 BadRequest kèm thông báo lỗi
+            return BadRequest(new { message = ex.Message });
         }
         catch (Exception ex)
         {
             return BadRequest(new { message = ex.Message });
         }
+    }
+
+    [Authorize]
+    [HttpGet("my-games")]
+    public async Task<IActionResult> GetMyGames(
+        [FromQuery] string? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 9)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+        if (userId == null) return Unauthorized();
+
+        if (string.IsNullOrEmpty(status)) status = "ALL";
+
+        var result = await _gameService.GetUserGamesAsync(userId, status.ToUpper(), page, pageSize);
+        return Ok(result);
     }
 
     // GET api/games/waiting (Lấy danh sách phòng chờ)
@@ -132,12 +155,18 @@ public class GamesController : ControllerBase
     }
 
     [Authorize]
+<<<<<<< HEAD
     [HttpGet("my-waiting-room")]
     public async Task<IActionResult> GetMyWaitingGame()
+=======
+    [HttpGet("current")]
+    public async Task<IActionResult> GetCurrentGame()
+>>>>>>> 3efbb6bcef957fb04fcd970e30cda3a5f228393d
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
         if (userId == null) return Unauthorized();
 
+<<<<<<< HEAD
         var game = await _gameService.GetWaitingGameByCreatorIdAsync(userId);
         if (game == null) return NotFound(new { message = "No waiting game found." });
         var enriched = await EnrichWithUsernames(new[] { game });
@@ -167,6 +196,31 @@ public class GamesController : ControllerBase
         }
 
         return Ok(new { message = "Game cancelled successfully" });
+=======
+        var game = await _gameService.GetActiveGameAsync(userId);
+
+        if (game == null) return NoContent(); // 204: Không có game nào đang active
+
+        return Ok(game);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetGames(
+        [FromQuery] string? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 9)
+    {
+        if (string.IsNullOrEmpty(status)) status = "WAITING";
+
+        var validStatuses = new[] { "WAITING", "PLAYING", "FINISHED" };
+        if (!validStatuses.Contains(status.ToUpper()))
+        {
+            return BadRequest(new { message = "Invalid status." });
+        }
+
+        var result = await _gameService.GetGamesByStatusAsync(status.ToUpper(), page, pageSize);
+        return Ok(result);
+>>>>>>> 3efbb6bcef957fb04fcd970e30cda3a5f228393d
     }
 
     [Authorize]

@@ -16,7 +16,16 @@ import ChatBox from "../components/chat-box";
 import ResignButton from "../components/resign-button";
 import OfferDrawButton from "../components/offer-draw-button";
 import PlayerCard from "../components/player-card";
+<<<<<<< HEAD
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+=======
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../components/ui/tabs";
+>>>>>>> 3efbb6bcef957fb04fcd970e30cda3a5f228393d
 
 interface GamePageProps {
   mockGame?: Game;
@@ -229,8 +238,12 @@ const GamePage = ({ mockGame, mockUser }: GamePageProps = {}) => {
 
   const whitePlayer = {
     id: game.whitePlayerId,
+<<<<<<< HEAD
     username:
       game.whitePlayerId === user.id ? "You (White)" : "Opponent (White)",
+=======
+    username: game.whiteUsername || "Unknown (White)",
+>>>>>>> 3efbb6bcef957fb04fcd970e30cda3a5f228393d
     timeMs: game.whiteTimeRemainingMs,
     isActive: isGamePlaying && currentTurn === "w",
     color: "w" as const,
@@ -239,12 +252,18 @@ const GamePage = ({ mockGame, mockUser }: GamePageProps = {}) => {
 
   const blackPlayer = {
     id: game.blackPlayerId,
+<<<<<<< HEAD
     username:
       game.blackPlayerId === user.id
         ? "You (Black)"
         : !game.blackPlayerId
         ? "Waiting..."
         : "Opponent (Black)",
+=======
+    username: game.blackPlayerId
+      ? game.blackUsername || "Unknown"
+      : "Waiting...", 
+>>>>>>> 3efbb6bcef957fb04fcd970e30cda3a5f228393d
     timeMs: game.blackTimeRemainingMs,
     isActive: isGamePlaying && currentTurn === "b",
     color: "b" as const,
@@ -442,6 +461,14 @@ const GamePage = ({ mockGame, mockUser }: GamePageProps = {}) => {
         <GameOverModal
           winnerId={game.winnerId}
           myId={user.id}
+          whitePlayer={{
+            id: game.whitePlayerId,
+            username: game.whiteUsername || "Unknown",
+          }}
+          blackPlayer={{
+            id: game.blackPlayerId,
+            username: game.blackUsername || "Unknown",
+          }}
           onClose={() => setShowModal(false)}
         />
       )}

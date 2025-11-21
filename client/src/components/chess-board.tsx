@@ -99,6 +99,8 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
 
     if (promotionMove) return;
 
+    if (promotionMove) return;
+
     if (selectedSquare === square) {
       resetSelection();
       return;
@@ -148,8 +150,14 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
   return (
     <div className="flex flex-col items-center w-full max-w-[80vh] mx-auto">
       <div
+<<<<<<< HEAD
         className={`w-[600px] p-4 transition-opacity duration-300 ${!isMyTurn && myColor !== "spectator" ? "opacity-90" : ""
           }`}
+=======
+        className={`w-full aspect-square transition-opacity duration-300 ${
+          !isMyTurn && myColor !== "spectator" ? "opacity-95" : ""
+        }`}
+>>>>>>> 3efbb6bcef957fb04fcd970e30cda3a5f228393d
       >
         <div className="w-full h-full rounded-lg overflow-hidden shadow-2xl bg-gray-800 grid grid-cols-8 border-4 border-gray-800">
           {boardToRender.map((row, rowIndex) =>
@@ -264,6 +272,7 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
                 />
               </button>
             </div>
+<<<<<<< HEAD
           </div>
         </div>
       )}        
@@ -291,14 +300,11 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
         {game.inCheck() && !game.isCheckmate() && (
           <div className="px-3 py-1 bg-red-600/80 rounded text-sm font-bold animate-pulse">
             CHIẾU!
+=======
+>>>>>>> 3efbb6bcef957fb04fcd970e30cda3a5f228393d
           </div>
-        )}
-        {game.isCheckmate() && (
-          <div className="px-3 py-1 bg-red-600 rounded text-sm font-bold">
-            CHIẾU BÍ!
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

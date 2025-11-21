@@ -1,4 +1,5 @@
 using ChessProject.Core.Entities;
+using ChessProject.Core.Models;
 
 namespace ChessProject.Core.Interfaces;
 
@@ -12,4 +13,4 @@ public interface IGameRepository
     Task<IEnumerable<Game>> GetGamesByStatusAsync(int page = 1, int pageSize = 10, string? status = "WAITING");
     Task<IEnumerable<Game>> GetGamesByUserAsync(Guid userId, int page, int pageSize);
     Task UpdateAsync(Game game);
-}
+    }

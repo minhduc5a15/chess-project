@@ -2,16 +2,19 @@ using ChessDotNet;
 using ChessProject.Application.DTOs;
 using ChessProject.Core.Entities;
 using ChessProject.Core.Interfaces;
+using ChessProject.Core.Models;
 
 namespace ChessProject.Application.Services;
 
 public class GameService : IGameService
 {
     private readonly IGameRepository _gameRepository;
+    private readonly IUserRepository _userRepository;
 
-    public GameService(IGameRepository gameRepository)
+    public GameService(IGameRepository gameRepository, IUserRepository userRepository)
     {
         _gameRepository = gameRepository;
+        _userRepository = userRepository;
     }
 
     // Core Methods (Public)
@@ -82,7 +85,52 @@ public class GameService : IGameService
     public async Task<GameDto?> GetGameByIdAsync(Guid gameId)
     {
         var game = await _gameRepository.GetByIdAsync(gameId);
-        return game == null ? null : MapToDto(game);
+        if (game == null) return null;
+
+        var dto = MapToDto(game);
+
+        // Map Username
+        var playerIds = new List<Guid>();
+        if (Guid.TryParse(game.WhitePlayerId, out var wId)) playerIds.Add(wId);
+        if (Guid.TryParse(game.BlackPlayerId, out var bId)) playerIds.Add(bId);
+
+        if (playerIds.Any())
+        {
+            var users = await _userRepository.GetUsersByIdsAsync(playerIds);
+            var userDict = users.ToDictionary(u => u.Id.ToString(), u => u.Username);
+
+            if (dto.WhitePlayerId != null && userDict.ContainsKey(dto.WhitePlayerId))
+                dto.WhiteUsername = userDict[dto.WhitePlayerId];
+
+            if (dto.BlackPlayerId != null && userDict.ContainsKey(dto.BlackPlayerId))
+                dto.BlackUsername = userDict[dto.BlackPlayerId];
+        }
+
+        return dto;
+    }
+
+    public async Task<GameDto?> GetActiveGameAsync(string userId)
+    {
+        var game = await _gameRepository.GetActiveGameByUserIdAsync(userId);
+        if (game == null) return null;
+
+        // Tái sử dụng logic GetGameByIdAsync để lấy full tên
+        return await GetGameByIdAsync(game.Id);
+    }
+
+    private async Task<PaginatedResult<GameDto>> MapPagedResult(PaginatedResult<Game> pagedGames) {
+        var playerIds = new List<Guid>();
+        foreach (var g in pagedGames.Items) { if (Guid.TryParse(g.WhitePlayerId, out var w)) playerIds.Add(w); if (Guid.TryParse(g.BlackPlayerId, out var b)) playerIds.Add(b); }
+        playerIds = playerIds.Distinct().ToList();
+        var users = await _userRepository.GetUsersByIdsAsync(playerIds);
+        var userDict = users.ToDictionary(u => u.Id.ToString(), u => u.Username);
+        var dtos = pagedGames.Items.Select(g => {
+            var d = MapToDto(g);
+            if (d.WhitePlayerId != null && userDict.ContainsKey(d.WhitePlayerId)) d.WhiteUsername = userDict[d.WhitePlayerId];
+            if (d.BlackPlayerId != null && userDict.ContainsKey(d.BlackPlayerId)) d.BlackUsername = userDict[d.BlackPlayerId];
+            return d;
+        }).ToList();
+        return new PaginatedResult<GameDto> { Items = dtos, TotalCount = pagedGames.TotalCount, PageIndex = pagedGames.PageIndex, PageSize = pagedGames.PageSize };
     }
 
     public async Task<bool> JoinGameAsync(Guid gameId, string playerId)
@@ -195,6 +243,60 @@ public class GameService : IGameService
         return true;
     }
 
+    public async Task<PaginatedResult<GameDto>> GetGamesByStatusAsync(string status, int page, int pageSize)
+    {
+        // 1. Lấy danh sách Game (Entity) từ Repository
+        var pagedGames = await _gameRepository.GetGamesByStatusAsync(status, page, pageSize);
+
+        // 2. Thu thập danh sách ID người chơi cần lấy tên
+        var playerIds = new List<Guid>();
+        foreach (var game in pagedGames.Items)
+        {
+            if (Guid.TryParse(game.WhitePlayerId, out var wId)) playerIds.Add(wId);
+            if (Guid.TryParse(game.BlackPlayerId, out var bId)) playerIds.Add(bId);
+        }
+
+        // Loại bỏ trùng lặp
+        playerIds = playerIds.Distinct().ToList();
+
+        // 3. Lấy thông tin User từ Repository
+        var users = await _userRepository.GetUsersByIdsAsync(playerIds);
+        var userDict = users.ToDictionary(u => u.Id.ToString(), u => u.Username);
+
+        // 4. Map Entity -> DTO và điền Username
+        var gameDtos = pagedGames.Items.Select(game => new GameDto
+        {
+            Id = game.Id,
+            WhitePlayerId = game.WhitePlayerId,
+            BlackPlayerId = game.BlackPlayerId,
+            // Map tên từ dictionary
+            WhiteUsername = game.WhitePlayerId != null && userDict.ContainsKey(game.WhitePlayerId)
+                ? userDict[game.WhitePlayerId]
+                : null,
+            BlackUsername = game.BlackPlayerId != null && userDict.ContainsKey(game.BlackPlayerId)
+                ? userDict[game.BlackPlayerId]
+                : null,
+
+            FEN = game.FEN,
+            Status = game.Status,
+            WinnerId = game.WinnerId,
+            WhiteTimeRemainingMs = game.WhiteTimeRemainingMs,
+            BlackTimeRemainingMs = game.BlackTimeRemainingMs,
+            LastMoveAt = game.LastMoveAt,
+            MoveHistory = game.MoveHistory,
+            CreatedAt = game.CreatedAt
+        }).ToList();
+
+        // 5. Trả về kết quả phân trang dạng DTO
+        return new PaginatedResult<GameDto>
+        {
+            Items = gameDtos,
+            TotalCount = pagedGames.TotalCount,
+            PageIndex = pagedGames.PageIndex,
+            PageSize = pagedGames.PageSize
+        };
+    }
+
     // Helper Methods (Private)
     private bool IsValidGameSession(Game? game, string playerId)
     {
@@ -291,6 +393,7 @@ public class GameService : IGameService
         {
             return halfMove;
         }
+
         return 0;
     }
 
