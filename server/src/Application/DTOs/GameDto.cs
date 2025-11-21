@@ -12,6 +12,7 @@ public class GameDto
 
     public long WhiteTimeRemainingMs { get; set; }
     public long BlackTimeRemainingMs { get; set; }
+    public long IncrementMs { get; set; }
     public DateTime? LastMoveAt { get; set; }
 
     public string MoveHistory { get; set; } = string.Empty;

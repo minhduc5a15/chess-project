@@ -10,6 +10,7 @@ export interface Game {
 
   whiteTimeRemainingMs: number;
   blackTimeRemainingMs: number;
+  incrementMs?: number;
   lastMoveAt: string | null;
 
   winnerId: string | null;

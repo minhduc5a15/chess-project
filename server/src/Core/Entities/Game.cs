@@ -17,6 +17,8 @@ public class Game
 
     public long WhiteTimeRemainingMs { get; set; } = 10 * 60 * 1000;
     public long BlackTimeRemainingMs { get; set; } = 10 * 60 * 1000;
+    // Increment per move in milliseconds
+    public long IncrementMs { get; set; } = 0;
 
     public DateTime? LastMoveAt { get; set; }
 

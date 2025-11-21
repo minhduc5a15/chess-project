@@ -15,6 +15,9 @@ const LobbyPage = () => {
   const pageSize = 6;
   const [myWaitingGame, setMyWaitingGame] = useState<Game | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [initialMinutes, setInitialMinutes] = useState<number>(10);
+  const [incrementSeconds, setIncrementSeconds] = useState<number>(0);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showProfile, setShowProfile] = useState(false);
   const [inviteTarget, setInviteTarget] = useState("");
 
@@ -68,8 +71,8 @@ const LobbyPage = () => {
         alert("Bạn đã có một phòng chờ. Hủy phòng hiện tại trước khi tạo phòng mới.");
         return;
       }
-
-      const newGame = await gameApi.createGame();
+      const newGame = await gameApi.createGame(initialMinutes, incrementSeconds);
+      setShowCreateModal(false);
       navigate(`/game/${newGame.id}`);
     } catch (error) {
       alert("Lỗi tạo phòng!");
@@ -137,6 +140,8 @@ const LobbyPage = () => {
       alert("Không thể hủy phòng");
     }
   };
+
+  // Create modal confirm flow is handled by `handleCreateGame` directly
 
   const handleInvite = async () => {
     if (!myWaitingGame) {
@@ -267,22 +272,42 @@ const LobbyPage = () => {
             <h2 className="text-3xl font-bold text-white">Sảnh chờ</h2>
             <p className="text-gray-500 mt-1">
               Tham gia hoặc tạo phòng để bắt đầu
+
+              {/* Create Game Modal */}
+              {showCreateModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/60" onClick={() => setShowCreateModal(false)} />
+                  <div className="relative bg-gray-900 p-6 rounded-lg w-96 z-10">
+                    <h3 className="text-lg font-bold mb-3">Tùy chỉnh thời gian trận đấu</h3>
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <label className="text-sm text-gray-300">Thời gian (phút)</label>
+                        <input type="number" min={1} value={initialMinutes} onChange={e => setInitialMinutes(Math.max(1, parseInt(e.target.value || '1')))} className="w-28 mt-1 p-2 bg-gray-800 rounded" />
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-300">Cộng thêm (giây)</label>
+                        <input type="number" min={0} value={incrementSeconds} onChange={e => setIncrementSeconds(Math.max(0, parseInt(e.target.value || '0')))} className="w-28 mt-1 p-2 bg-gray-800 rounded" />
+                      </div>
+                    </div>
+                    <div className="mt-6 flex justify-end gap-3">
+                      <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 bg-gray-700 rounded">Hủy</button>
+                      <button onClick={handleCreateGame} disabled={isLoading || !!myWaitingGame} className="px-4 py-2 bg-green-600 rounded font-bold">{isLoading ? 'Đang tạo...' : 'Tạo'}</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={handleCreateGame}
-              disabled={isLoading || !!myWaitingGame}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold text-white shadow-lg shadow-green-900/50 transition-transform active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-2"
-            >
-              {isLoading ? (
-                "Đang tạo..."
-              ) : (
-                <>
-                  <span className="text-xl">+</span> Tạo phòng mới
-                </>
-              )}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                disabled={isLoading || !!myWaitingGame}
+                className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold text-white shadow-lg shadow-green-900/50 transition-transform active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-2"
+              >
+                <span className="text-xl">+</span> Tạo phòng mới
+              </button>
+            </div>
             {myWaitingGame && (
               <div className="flex items-center gap-3">
                 <div className="text-sm text-gray-300">ROOM #{myWaitingGame.id.substring(0, 6)}</div>

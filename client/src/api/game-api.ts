@@ -18,9 +18,9 @@ export const gameApi = {
     return response.data;
   },
 
-  // Tạo phòng mới
-  createGame: async (): Promise<Game> => {
-    const response = await apiClient.post("/games");
+  // Tạo phòng mới (accepts initialMinutes and incrementSeconds)
+  createGame: async (initialMinutes = 10, incrementSeconds = 0): Promise<Game> => {
+    const response = await apiClient.post("/games", { initialMinutes, incrementSeconds });
     return response.data;
   },
 

@@ -51,6 +51,7 @@ public class GamesController : ControllerBase
                 g.Status,
                 g.CreatedAt,
                 g.WhiteTimeRemainingMs,
+                g.IncrementMs,
                 g.BlackTimeRemainingMs,
                 g.LastMoveAt,
                 g.WinnerId,
@@ -63,9 +64,15 @@ public class GamesController : ControllerBase
     }
 
     // POST api/games (Tạo phòng)
+    public class CreateGameRequest
+    {
+        public int InitialMinutes { get; set; } = 10;
+        public int IncrementSeconds { get; set; } = 0;
+    }
+
     [Authorize] // Bắt buộc phải có Token hợp lệ
     [HttpPost]
-    public async Task<IActionResult> CreateGame()
+    public async Task<IActionResult> CreateGame([FromBody] CreateGameRequest? request)
     {
         try
         {
@@ -79,7 +86,10 @@ public class GamesController : ControllerBase
 
             if (userId == null) return Unauthorized();
 
-            var game = await _gameService.CreateGameAsync(userId);
+            var minutes = request?.InitialMinutes ?? 10;
+            var increment = request?.IncrementSeconds ?? 0;
+
+            var game = await _gameService.CreateGameAsync(userId, minutes, increment);
             return Ok(game);
         }
         catch (Exception ex)

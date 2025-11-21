@@ -15,7 +15,7 @@ public class GameService : IGameService
     }
 
     // Core Methods (Public)
-    public async Task<GameDto> CreateGameAsync(string playerId)
+    public async Task<GameDto> CreateGameAsync(string playerId, int initialMinutes = 10, int incrementSeconds = 0)
     {
         // 1. Kiểm tra giới hạn 1 phòng chờ cho mỗi user
         var existing = await _gameRepository.GetWaitingGameByCreatorIdAsync(playerId);
@@ -29,7 +29,10 @@ public class GameService : IGameService
             Id = Guid.NewGuid(),
             WhitePlayerId = playerId,
             Status = "WAITING",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            WhiteTimeRemainingMs = (long)initialMinutes * 60 * 1000,
+            BlackTimeRemainingMs = (long)initialMinutes * 60 * 1000,
+            IncrementMs = (long)incrementSeconds * 1000
         };
 
         await _gameRepository.AddAsync(game);
@@ -130,6 +133,19 @@ public class GameService : IGameService
 
         // 7. Cập nhật trạng thái game (FEN, History, Winner...)
         UpdateGameState(game, chessGame, moveUCI, playerId);
+
+        // 8. Thêm increment cho người vừa đi (nếu có)
+        if (game.IncrementMs > 0)
+        {
+            if (playerId == game.WhitePlayerId)
+            {
+                game.WhiteTimeRemainingMs += game.IncrementMs;
+            }
+            else if (playerId == game.BlackPlayerId)
+            {
+                game.BlackTimeRemainingMs += game.IncrementMs;
+            }
+        }
 
         // 8. Lưu xuống DB
         await _gameRepository.UpdateAsync(game);
@@ -298,6 +314,7 @@ public class GameService : IGameService
             // Mapping thêm các trường thời gian
             WhiteTimeRemainingMs = game.WhiteTimeRemainingMs,
             BlackTimeRemainingMs = game.BlackTimeRemainingMs,
+            IncrementMs = game.IncrementMs,
             LastMoveAt = game.LastMoveAt,
             WinnerId = game.WinnerId,
             MoveHistory = game.MoveHistory
