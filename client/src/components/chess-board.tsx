@@ -57,7 +57,7 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
         setLastMove({ from, to });
 
         // 3. Gửi nước đi lên GamePage (để bắn SignalR)
-        onMove({ from, to, promotion: "q" }, gameCopy.fen());
+        onMove({ from, to, promotion: "" }, gameCopy.fen());
         return true;
       }
     } catch (e) {

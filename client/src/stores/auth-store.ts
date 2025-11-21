@@ -1,11 +1,6 @@
 import { create } from "zustand";
 import apiClient from "../lib/axios";
-
-interface User {
-  id: string;
-  username: string;
-  role: string;
-}
+import type { User } from "../types/user";
 
 interface AuthState {
   user: User | null;
@@ -14,6 +9,7 @@ interface AuthState {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  updateUserAvatar: (url: string) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -38,6 +34,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const response = await apiClient.get("/auth/me");
+      console.log("Authenticated user:", response.data);
       set({ user: response.data, isAuthenticated: true });
     } catch (error) {
       set({ user: null, isAuthenticated: false });
@@ -45,5 +42,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     } finally {
       set({ isLoading: false });
     }
+  },
+  updateUserAvatar: (url: string) => {
+    set((state) => ({
+      user: state.user ? { ...state.user, avatarUrl: url } : null,
+    }));
   },
 }));

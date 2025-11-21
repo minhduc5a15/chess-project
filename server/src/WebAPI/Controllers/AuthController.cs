@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ChessProject.Application.DTOs;
 using ChessProject.Application.Services;
+using ChessProject.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,10 +12,12 @@ namespace ChessProject.WebAPI.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IUserRepository _userRepository; // [MỚI] Khai báo Repository
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IUserRepository userRepository)
     {
         _authService = authService;
+        _userRepository = userRepository;
     }
 
     [HttpPost("register")] // POST api/auth/register
@@ -72,12 +75,35 @@ public class AuthController : ControllerBase
 
     [Authorize]
     [HttpGet("me")]
-    public IActionResult GetMe()
+    public async Task<IActionResult> GetMe()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var username = User.FindFirstValue(ClaimTypes.Name);
-        var role = User.FindFirstValue(ClaimTypes.Role);
+        // 1. Lấy ID từ Token
+        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-        return Ok(new { id = userId, username, role });
+        // Fallback cho trường hợp ID nằm ở claim "sub"
+        if (string.IsNullOrEmpty(userIdString))
+        {
+            userIdString = User.FindFirstValue("sub");
+        }
+
+        if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
+        {
+            return Unauthorized();
+        }
+
+        // 2. Truy vấn Database để lấy thông tin mới nhất (bao gồm AvatarUrl)
+        var user = await _userRepository.GetByIdAsync(userId);
+
+        if (user == null) return Unauthorized();
+
+        // 3. Trả về đầy đủ thông tin
+        return Ok(new
+        {
+            id = user.Id,
+            username = user.Username,
+            role = user.Role,
+            avatarUrl = user.AvatarUrl,
+            createdAt = user.CreatedAt
+        });
     }
 }
