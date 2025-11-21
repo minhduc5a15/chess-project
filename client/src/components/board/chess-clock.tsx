@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState, useRef } from "react";
 
 interface ChessClockProps {
@@ -67,12 +69,13 @@ const ChessClock = ({
 
   return (
     <div
-      className={`px-4 py-2 rounded-lg text-xl font-mono font-bold shadow-md transition-all border-2 ${
+      className={`px-3 py-1.5 rounded font-mono font-bold text-lg transition-colors ${
         isActive
-          ? "bg-yellow-500 text-black scale-110 shadow-yellow-500/50 border-white"
-          : "bg-gray-800 text-gray-400 border-gray-700 opacity-80"
-      } ${color === "w" && isActive ? "bg-white/90 text-black" : ""} ${
-        color === "b" && isActive ? "bg-black/90 text-white" : ""
+          ? "bg-slate-100 text-slate-900 shadow-[0_0_10px_rgba(255,255,255,0.3)]"
+          : "bg-slate-800/50 text-slate-400"
+      } ${
+        // Critical time warning (< 30s)
+        isActive && displayTime < 30000 ? "text-red-600 bg-red-100" : ""
       }`}
     >
       {formatTime(displayTime)}

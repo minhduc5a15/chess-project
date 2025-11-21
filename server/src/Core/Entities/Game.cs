@@ -6,7 +6,7 @@ public class Game
     public string? WhitePlayerId { get; set; }
     public string? BlackPlayerId { get; set; }
 
-    public string FEN { get; set; } = "7r/4k3/8/8/8/8/8/1N2K1B1 w - - 0 1";
+    public string FEN { get; set; } = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
     public string MoveHistory { get; set; } = "";
 

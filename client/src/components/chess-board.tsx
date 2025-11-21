@@ -1,5 +1,7 @@
+"use client";
+
 import { useEffect, useState } from "react";
-import { Chess, type Square, type Piece, Move } from "chess.js";
+import { Chess, type Square, type Piece, type Move } from "chess.js";
 import BoardSquare from "./board/board-square";
 import ChessPiece from "./board/chess-piece";
 import { getPieceImageUrl } from "../lib/chess-utils";
@@ -61,13 +63,13 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
 
     try {
       const gameCopy = new Chess(game.fen());
-      const moveOptions = {from, to, promotion: promotion || 'q'};
+      const moveOptions = { from, to, promotion: promotion || "q" };
       const moveResult = gameCopy.move(moveOptions);
 
       if (moveResult) {
         if (!promotion && moveResult.promotion) {
           setPromotionMove({ from, to });
-          return false; 
+          return false;
         }
         setGame(gameCopy);
         setLastMove({ from, to });
@@ -143,13 +145,13 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
   };
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center w-full max-w-[80vh] mx-auto">
       <div
-        className={`w-[600px] p-4 transition-opacity duration-300 ${
-          !isMyTurn && myColor !== "spectator" ? "opacity-90" : ""
+        className={`w-full aspect-square transition-opacity duration-300 ${
+          !isMyTurn && myColor !== "spectator" ? "opacity-95" : ""
         }`}
       >
-        <div className="aspect-square w-full border-6 border-gray-800 rounded-sm overflow-hidden shadow-2xl bg-gray-800 grid grid-cols-8">
+        <div className="w-full h-full rounded-lg overflow-hidden shadow-2xl bg-gray-800 grid grid-cols-8 border-4 border-gray-800">
           {boardToRender.map((row, rowIndex) =>
             row.map((piece, colIndex) => {
               // Tính toán lại tọa độ dựa trên việc có xoay bàn cờ hay không
@@ -195,93 +197,76 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
             })
           )}
         </div>
-        </div>
+      </div>
 
       {/* Promotion selector (simple) */}
       {promotionMove && (
-        <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center">
-          <div className="bg-gray-900 p-6 rounded-lg border-2 border-yellow-500 shadow-2xl">
-            <div className="text-white font-bold mb-4 text-center">Chọn quân phong cấp</div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-slate-900 p-8 rounded-2xl border border-slate-700 shadow-2xl transform transition-all scale-100">
+            <div className="text-white text-xl font-bold mb-6 text-center">
+              Promote Pawn
+            </div>
             <div className="flex gap-4">
               <button
                 onClick={() => onPromotionSelect("q")}
-                className="w-20 h-20 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center transition transform hover:scale-110"
-                title="Hậu (Queen)"
+                className="w-24 h-24 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center justify-center transition-all hover:scale-105 hover:shadow-lg border border-slate-700 hover:border-slate-500"
+                title="Queen"
               >
                 <img
-                  src={getPieceImageUrl(promotionMove ? (game.turn() === "w" ? "w" : "b") : "w", "q")}
+                  src={getPieceImageUrl(
+                    promotionMove ? (game.turn() === "w" ? "w" : "b") : "w",
+                    "q"
+                  )}
                   alt="Queen"
-                  className="w-16 h-16"
+                  className="w-20 h-20 drop-shadow-lg"
                 />
               </button>
               <button
                 onClick={() => onPromotionSelect("r")}
-                className="w-20 h-20 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center transition transform hover:scale-110"
-                title="Xe (Rook)"
+                className="w-24 h-24 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center justify-center transition-all hover:scale-105 hover:shadow-lg border border-slate-700 hover:border-slate-500"
+                title="Rook"
               >
                 <img
-                  src={getPieceImageUrl(promotionMove ? (game.turn() === "w" ? "w" : "b") : "w", "r")}
+                  src={getPieceImageUrl(
+                    promotionMove ? (game.turn() === "w" ? "w" : "b") : "w",
+                    "r"
+                  )}
                   alt="Rook"
-                  className="w-16 h-16"
+                  className="w-20 h-20 drop-shadow-lg"
                 />
               </button>
               <button
                 onClick={() => onPromotionSelect("b")}
-                className="w-20 h-20 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center transition transform hover:scale-110"
-                title="Tượng (Bishop)"
+                className="w-24 h-24 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center justify-center transition-all hover:scale-105 hover:shadow-lg border border-slate-700 hover:border-slate-500"
+                title="Bishop"
               >
                 <img
-                  src={getPieceImageUrl(promotionMove ? (game.turn() === "w" ? "w" : "b") : "w", "b")}
+                  src={getPieceImageUrl(
+                    promotionMove ? (game.turn() === "w" ? "w" : "b") : "w",
+                    "b"
+                  )}
                   alt="Bishop"
-                  className="w-16 h-16"
+                  className="w-20 h-20 drop-shadow-lg"
                 />
               </button>
               <button
                 onClick={() => onPromotionSelect("n")}
-                className="w-20 h-20 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center transition transform hover:scale-110"
-                title="Mã (Knight)"
+                className="w-24 h-24 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center justify-center transition-all hover:scale-105 hover:shadow-lg border border-slate-700 hover:border-slate-500"
+                title="Knight"
               >
                 <img
-                  src={getPieceImageUrl(promotionMove ? (game.turn() === "w" ? "w" : "b") : "w", "n")}
+                  src={getPieceImageUrl(
+                    promotionMove ? (game.turn() === "w" ? "w" : "b") : "w",
+                    "n"
+                  )}
                   alt="Knight"
-                  className="w-16 h-16"
+                  className="w-20 h-20 drop-shadow-lg"
                 />
               </button>
             </div>
           </div>
         </div>
-      )}        {/* Thanh trạng thái */}
-      <div className="mt-4 text-white bg-gray-800 px-6 py-3 rounded-full shadow-lg flex items-center gap-4">
-        <div className="text-lg">
-          Lượt:{" "}
-          <strong
-            className={game.turn() === "w" ? "text-green-400" : "text-gray-400"}
-          >
-            {game.turn() === "w" ? "TRẮNG" : "ĐEN"}
-          </strong>
-        </div>
-        <div className="text-sm px-3 py-1 bg-blue-900/50 rounded-full border border-blue-700">
-          Bạn:{" "}
-          <strong className="uppercase text-blue-300">
-            {myColor === "spectator"
-              ? "Xem"
-              : myColor === "w"
-              ? "Trắng"
-              : "Đen"}
-          </strong>
-        </div>
-
-        {game.inCheck() && !game.isCheckmate() && (
-          <div className="px-3 py-1 bg-red-600/80 rounded text-sm font-bold animate-pulse">
-            CHIẾU!
-          </div>
-        )}
-        {game.isCheckmate() && (
-          <div className="px-3 py-1 bg-red-600 rounded text-sm font-bold">
-            CHIẾU BÍ!
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 };
