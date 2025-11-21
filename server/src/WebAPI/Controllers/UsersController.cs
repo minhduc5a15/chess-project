@@ -98,4 +98,45 @@ public class UsersController : ControllerBase
 
         return Ok(new { avatarUrl = user.AvatarUrl });
     }
+
+    [Authorize]
+    [HttpPut("profile")]
+    public async Task<IActionResult> UpdateProfile([FromBody] ChessProject.Application.DTOs.UpdateProfileDto dto)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier); // Lấy ID từ Token
+
+        // Fallback tìm claim "sub" nếu NameIdentifier null (đề phòng)
+        if (userId == null) userId = User.FindFirstValue("sub");
+
+        if (userId == null) return Unauthorized();
+
+        var user = await _userRepository.GetByIdAsync(Guid.Parse(userId));
+        if (user == null) return NotFound();
+
+        // Cập nhật Bio
+        user.Bio = dto.Bio;
+
+        // Lưu xuống DB
+        await _userRepository.UpdateAsync(user);
+
+        return Ok(new { message = "Profile updated successfully", bio = user.Bio });
+    }
+
+    [Authorize]
+    [HttpGet("{username}")]
+    public async Task<IActionResult> GetUserProfile(string username)
+    {
+        var user = await _userRepository.GetByUsernameAsync(username);
+        if (user == null) return NotFound(new { message = "User not found" });
+
+        return Ok(new
+        {
+            user.Id,
+            user.Username,
+            user.Role,
+            user.AvatarUrl,
+            user.Bio,
+            user.CreatedAt
+        });
+    }
 }

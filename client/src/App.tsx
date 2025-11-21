@@ -12,6 +12,7 @@ import RegisterPage from "./pages/register-page";
 import LobbyPage from "./pages/lobby-page";
 import GamePage from "./pages/game-page";
 import AdminPage from "./pages/admin-page";
+import ProfilePage from "./pages/profile-page";
 
 // Component bảo vệ route
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -56,6 +57,7 @@ function App() {
           <Route path="/" element={<LobbyPage />} />
           <Route path="/game/:gameId" element={<GamePage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/user/:username" element={<ProfilePage />} />
         </Route>
       </Routes>
     </BrowserRouter>

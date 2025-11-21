@@ -12,7 +12,7 @@ namespace ChessProject.WebAPI.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
-    private readonly IUserRepository _userRepository; // [MỚI] Khai báo Repository
+    private readonly IUserRepository _userRepository; // Khai báo Repository
 
     public AuthController(IAuthService authService, IUserRepository userRepository)
     {

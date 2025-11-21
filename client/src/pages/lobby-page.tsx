@@ -64,7 +64,7 @@ const LobbyPage = () => {
         <div className="flex items-center gap-6">
           {/* User Info Clickable */}
           <button
-            onClick={() => setShowProfile(true)}
+            onClick={() => user && navigate(`/user/${user.username}`)}
             className="flex items-center gap-3 hover:bg-gray-800 p-2 rounded-lg transition cursor-pointer"
           >
             <div className="w-9 h-9 rounded-full bg-gray-700 overflow-hidden border border-gray-500">

@@ -25,4 +25,13 @@ export const userApi = {
     });
     return response.data.avatarUrl;
   },
+
+  getUserProfile: async (userId: string): Promise<User> => {
+    const response = await apiClient.get(`/users/${userId}`);
+    return response.data;
+  },
+
+  updateProfile: async (bio: string): Promise<void> => {
+    await apiClient.put("/users/profile", { bio });
+  },
 };
