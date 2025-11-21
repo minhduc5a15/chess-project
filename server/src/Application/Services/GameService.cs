@@ -199,4 +199,47 @@ public class GameService : IGameService
             MoveHistory = game.MoveHistory
         };
     }
+
+    public async Task<bool> ResignAsync(Guid gameId, string playerId)
+    {
+        var game = await _gameRepository.GetByIdAsync(gameId);
+        if (game == null || game.Status != "PLAYING") return false;
+
+        string? winnerId = null;
+        if (playerId == game.WhitePlayerId)
+        {
+            winnerId = game.BlackPlayerId; // Trắng đầu hàng -> Đen thắng
+        }
+        else if (playerId == game.BlackPlayerId)
+        {
+            winnerId = game.WhitePlayerId; // Đen đầu hàng -> Trắng thắng
+        }
+        else
+        {
+            return false; // Người gọi không phải người chơi
+        }
+
+        // Cập nhật trạng thái
+        game.Status = "FINISHED";
+        game.WinnerId = winnerId;
+        game.FinishedAt = DateTime.UtcNow;
+
+        game.MoveHistory += " (Resign)";
+
+        await _gameRepository.UpdateAsync(game);
+        return true;
+    }
+
+    public async Task<bool> DrawAsync(Guid gameId)
+    {
+        var game = await _gameRepository.GetByIdAsync(gameId);
+        if (game == null || game.Status != "PLAYING") return false;
+
+        game.Status = "FINISHED";
+        game.WinnerId = null; // Null nghĩa là Hòa
+        game.FinishedAt = DateTime.UtcNow;
+
+        await _gameRepository.UpdateAsync(game);
+        return true;
+    }
 }

@@ -11,6 +11,8 @@ import GameOverModal from "../components/game-over-modal";
 import MoveHistory from "../components/move-history";
 import { type ChatMessage } from "../types/chat";
 import ChatBox from "../components/chat-box";
+import ResignButton from "../components/resign-button";
+import OfferDrawButton from "../components/offer-draw-button";
 
 const GamePage = () => {
   const { gameId } = useParams();
@@ -107,16 +109,32 @@ const GamePage = () => {
 
       const handleReceiveMessage = (message: ChatMessage) => {
         setMessages((prev) => [...prev, message]);
-      }
+      };
+
+      const handleDrawOffered = (senderId: string) => {
+        if (senderId !== user?.id) {
+          const agree = window.confirm("Đối thủ cầu hòa. Bạn có đồng ý không?");
+          connection.invoke("RespondDraw", gameId, agree);
+        }
+      };
+
+      const handleGameOver = () => {
+        fetchGameData(); // Lấy lại trạng thái cuối cùng (WinnerId, Status)
+        // Modal sẽ tự hiện nhờ useEffect theo dõi game.status
+      };
 
       connection.on("UpdateBoard", handleUpdateBoard);
       connection.on("ReceiveMessage", handleReceiveMessage);
+      connection.on("DrawOffered", handleDrawOffered);
+      connection.on("GameOver", handleGameOver);
       return () => {
         connection.off("UpdateBoard", handleUpdateBoard);
         connection.off("ReceiveMessage", handleReceiveMessage);
+        connection.off("DrawOffered", handleDrawOffered);
+        connection.off("GameOver", handleGameOver);
       };
     }
-  }, [connection, isConnected, gameId, fetchGameData]);
+  }, [connection, isConnected, gameId, fetchGameData, user]);
 
   // Hiện modal kết thúc
   useEffect(() => {
@@ -161,7 +179,21 @@ const GamePage = () => {
     } catch (error) {
       console.error("Lỗi gửi tin nhắn:", error);
     }
-  }
+  };
+
+  const handleResign = async () => {
+    if (!window.confirm("Bạn chắc chắn muốn đầu hàng?")) return;
+    if (connection && isConnected && gameId) {
+      await connection.invoke("Resign", gameId);
+    }
+  };
+
+  const handleOfferDraw = async () => {
+    if (connection && isConnected && gameId) {
+      await connection.invoke("OfferDraw", gameId);
+      alert("Đã gửi lời mời cầu hòa!");
+    }
+  };
 
   if (isLoading)
     return (
@@ -208,50 +240,67 @@ const GamePage = () => {
           <div className="flex-1 flex flex-col items-center">
             <ChessBoard fen={game.fen} myColor={myColor} onMove={handleMove} />
 
-            <div className="mt-6 flex justify-center gap-8 w-full max-w-[600px]">
-              {/* Player Trắng */}
-              <div className="flex flex-col items-center gap-3">
-                <ChessClock
-                  timeMs={game.whiteTimeRemainingMs}
-                  isActive={isGamePlaying && currentTurn === "w"}
-                  lastMoveAt={game.lastMoveAt || undefined}
-                  color="w"
-                />
-                <div
-                  className={`flex items-center gap-2 ${
-                    game.whitePlayerId === user.id
-                      ? "text-green-400"
-                      : "text-gray-400"
-                  }`}
-                >
-                  <div className="w-4 h-4 bg-white rounded-full"></div>
-                  {game.whitePlayerId === user.id ? "Bạn (Trắng)" : "Đối thủ"}
+            <div className="mt-6 flex flex-col items-center gap-6 w-full max-w-[600px]">
+              {/* Clocks and Players */}
+              <div className="flex justify-center gap-8 w-full">
+                {/* Player Trắng */}
+                <div className="flex flex-col items-center gap-3">
+                  <ChessClock
+                    timeMs={game.whiteTimeRemainingMs}
+                    isActive={isGamePlaying && currentTurn === "w"}
+                    lastMoveAt={game.lastMoveAt || undefined}
+                    color="w"
+                  />
+                  <div
+                    className={`flex items-center gap-2 ${
+                      game.whitePlayerId === user.id
+                        ? "text-green-400"
+                        : "text-gray-400"
+                    }`}
+                  >
+                    <div className="w-4 h-4 bg-white rounded-full"></div>
+                    {game.whitePlayerId === user.id ? "Bạn (Trắng)" : "Đối thủ"}
+                  </div>
+                </div>
+
+                {/* Player Đen */}
+                <div className="flex flex-col items-center gap-3">
+                  <ChessClock
+                    timeMs={game.blackTimeRemainingMs}
+                    isActive={isGamePlaying && currentTurn === "b"}
+                    lastMoveAt={game.lastMoveAt || undefined}
+                    color="b"
+                  />
+                  <div
+                    className={`flex items-center gap-2 ${
+                      game.blackPlayerId === user.id
+                        ? "text-green-400"
+                        : "text-gray-400"
+                    }`}
+                  >
+                    <div className="w-4 h-4 bg-black border border-gray-600 rounded-full"></div>
+                    {game.blackPlayerId === user.id
+                      ? "Bạn (Đen)"
+                      : !game.blackPlayerId
+                      ? "Đang chờ..."
+                      : "Đối thủ"}
+                  </div>
                 </div>
               </div>
 
-              {/* Player Đen */}
-              <div className="flex flex-col items-center gap-3">
-                <ChessClock
-                  timeMs={game.blackTimeRemainingMs}
-                  isActive={isGamePlaying && currentTurn === "b"}
-                  lastMoveAt={game.lastMoveAt || undefined}
-                  color="b"
-                />
-                <div
-                  className={`flex items-center gap-2 ${
-                    game.blackPlayerId === user.id
-                      ? "text-green-400"
-                      : "text-gray-400"
-                  }`}
-                >
-                  <div className="w-4 h-4 bg-black border border-gray-600 rounded-full"></div>
-                  {game.blackPlayerId === user.id
-                    ? "Bạn (Đen)"
-                    : !game.blackPlayerId
-                    ? "Đang chờ..."
-                    : "Đối thủ"}
+              {/* Game Control Buttons */}
+              {isGamePlaying && myColor !== "spectator" && (
+                <div className="flex gap-3 w-full justify-center">
+                  <OfferDrawButton
+                    onOfferDraw={handleOfferDraw}
+                    disabled={!isGamePlaying}
+                  />
+                  <ResignButton
+                    onResign={handleResign}
+                    disabled={!isGamePlaying}
+                  />
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="w-full mt-6">

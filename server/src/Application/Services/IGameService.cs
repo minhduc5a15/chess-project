@@ -11,4 +11,7 @@ public interface IGameService
     Task<bool> JoinGameAsync(Guid gameId, string playerId);
 
     Task<bool> MakeMoveAsync(Guid gameId, string moveUCI, string playerId);
+
+    Task<bool> ResignAsync(Guid gameId, string playerId);
+    Task<bool> DrawAsync(Guid gameId);
 }

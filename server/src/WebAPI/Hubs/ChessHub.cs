@@ -1,7 +1,6 @@
 using ChessProject.Application.Services;
 using Microsoft.AspNetCore.SignalR;
 using ChessProject.Core.Interfaces;
-using System.Security.Claims;
 using ChessProject.Core.Entities;
 
 namespace ChessProject.WebAPI.Hubs;
@@ -30,7 +29,6 @@ public class ChessHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, gameId);
     }
 
-    // Cập nhật: Nhận thêm FEN mới để lưu vào DB
     public async Task SendMove(string gameId, string moveUCI, string newFen)
     {
         var userId = Context.UserIdentifier;
@@ -82,5 +80,48 @@ public class ChessHub : Hub
             content = messageContent,
             createdAt = chatMessage.CreatedAt
         });
+    }
+
+    public async Task Resign(string gameId)
+    {
+        var userId = Context.UserIdentifier;
+        if (string.IsNullOrEmpty(userId) || !Guid.TryParse(gameId, out var gId)) return;
+
+        var success = await _gameService.ResignAsync(gId, userId);
+        if (success)
+        {
+            // Lấy thông tin game mới nhất để biết ai thắng
+            var game = await _gameService.GetGameByIdAsync(gId);
+            // Gửi sự kiện GameOver cho cả phòng
+            await Clients.Group(gameId).SendAsync("GameOver", game.WinnerId);
+        }
+    }
+
+    public async Task OfferDraw(string gameId)
+    {
+        var userId = Context.UserIdentifier;
+        // Gửi sự kiện DrawOffered cho người trong phòng
+        // Client sẽ tự check: Nếu người gửi != mình thì hiện Popup
+        await Clients.Group(gameId).SendAsync("DrawOffered", userId);
+    }
+
+    public async Task RespondDraw(string gameId, bool isAccepted)
+    {
+        if (!isAccepted)
+        {
+            // Lười làm cái này quá
+            // await Clients.Group(gameId).SendAsync("DrawDeclined");
+            return;
+        }
+
+        if (Guid.TryParse(gameId, out var gId))
+        {
+            var success = await _gameService.DrawAsync(gId);
+            if (success)
+            {
+                // Báo GameOver với winnerId = null (Hòa)
+                await Clients.Group(gameId).SendAsync("GameOver", null);
+            }
+        }
     }
 }
