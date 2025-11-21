@@ -1,16 +1,23 @@
-using ChessProject.Application.Services; // Thêm using
+using ChessProject.Application.Services;
 using Microsoft.AspNetCore.SignalR;
+using ChessProject.Core.Interfaces;
+using System.Security.Claims;
+using ChessProject.Core.Entities;
 
 namespace ChessProject.WebAPI.Hubs;
 
 public class ChessHub : Hub
 {
     private readonly IGameService _gameService;
+    private readonly IChatRepository _chatRepository;
+    private readonly IUserRepository _userRepository;
 
     // Inject GameService vào Hub
-    public ChessHub(IGameService gameService)
+    public ChessHub(IGameService gameService, IChatRepository chatRepository, IUserRepository userRepository)
     {
         _gameService = gameService;
+        _chatRepository = chatRepository;
+        _userRepository = userRepository;
     }
 
     public async Task JoinGame(string gameId)
@@ -44,5 +51,36 @@ public class ChessHub : Hub
                 }
             }
         }
+    }
+
+    public async Task SendMessage(string gameId, string messageContent)
+    {
+        if (string.IsNullOrWhiteSpace(messageContent)) return;
+
+        var userIdString = Context.UserIdentifier;
+        if (userIdString == null || !Guid.TryParse(gameId, out var gId)) return;
+
+        var user = await _userRepository.GetByIdAsync(Guid.Parse(userIdString));
+        if (user == null) return;
+
+        // 3. Tạo và lưu tin nhắn vào DB
+        var chatMessage = new ChatMessage
+        {
+            Id = Guid.NewGuid(),
+            GameId = gId,
+            UserId = user.Id,
+            Username = user.Username,
+            Content = messageContent,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _chatRepository.AddAsync(chatMessage);
+
+        await Clients.Group(gameId).SendAsync("ReceiveMessage", new
+        {
+            username = user.Username,
+            content = messageContent,
+            createdAt = chatMessage.CreatedAt
+        });
     }
 }

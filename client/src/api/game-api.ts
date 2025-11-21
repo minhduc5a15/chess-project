@@ -1,4 +1,5 @@
 import apiClient from "../lib/axios";
+import type { ChatMessage } from "../types/chat";
 import { type Game } from "../types/game";
 
 export const gameApi = {
@@ -22,6 +23,11 @@ export const gameApi = {
   // Lấy thông tin chi tiết một phòng
   getGame: async (gameId: string): Promise<Game> => {
     const response = await apiClient.get(`/games/${gameId}`);
+    return response.data;
+  },
+
+  getMessages: async (gameId: string): Promise<ChatMessage[]> => {
+    const response = await apiClient.get(`/games/${gameId}/messages`);
     return response.data;
   },
 };

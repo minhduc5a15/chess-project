@@ -2,6 +2,7 @@ using System.Security.Claims;
 using ChessProject.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ChessProject.Core.Interfaces;
 
 namespace ChessProject.WebAPI.Controllers;
 
@@ -10,10 +11,12 @@ namespace ChessProject.WebAPI.Controllers;
 public class GamesController : ControllerBase
 {
     private readonly IGameService _gameService;
+    private readonly IChatRepository _chatRepository;
 
-    public GamesController(IGameService gameService)
+    public GamesController(IGameService gameService, IChatRepository chatRepository)
     {
         _gameService = gameService;
+        _chatRepository = chatRepository;
     }
 
     // POST api/games (Tạo phòng)
@@ -72,6 +75,14 @@ public class GamesController : ControllerBase
         {
             return BadRequest(new { success, message = "Cannot join game (it might be full or you are the owner)." });
         }
+
         return Ok(new { message = "Joined game successfully" });
+    }
+
+    [HttpGet("{id}/messages")]
+    public async Task<IActionResult> GetMessages(Guid id)
+    {
+        var messages = await _chatRepository.GetMessagesByGameIdAsync(id);
+        return Ok(messages);
     }
 }
