@@ -1,10 +1,14 @@
+"use client";
+
+import type React from "react";
+
 import { useEffect, useRef, useState } from "react";
-import { type ChatMessage } from "../types/chat";
+import type { ChatMessage } from "../types/chat";
 
 interface ChatBoxProps {
   messages: ChatMessage[];
   onSendMessage: (message: string) => void;
-  currentUser: string; 
+  currentUser: string;
 }
 
 const ChatBox = ({ messages, onSendMessage, currentUser }: ChatBoxProps) => {
@@ -25,23 +29,54 @@ const ChatBox = ({ messages, onSendMessage, currentUser }: ChatBoxProps) => {
   };
 
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-[400px] h-96 flex flex-col shadow-xl">
+    <div className="bg-slate-900 border border-slate-800 rounded-xl w-full h-full flex flex-col shadow-lg overflow-hidden">
       {/* Header */}
-      <div className="bg-gray-800 px-4 py-3 font-bold border-b border-gray-700 text-gray-300 flex justify-between items-center">
-        <span>💬 Trò chuyện</span>
-        <span className="text-xs bg-gray-700 px-2 py-1 rounded text-gray-400">
-          {messages.length} tin nhắn
+      <div className="bg-slate-900 px-4 py-3 font-bold border-b border-slate-800 text-slate-200 flex justify-between items-center">
+        <span className="flex items-center gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-slate-400"
+          >
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          Chat Room
+        </span>
+        <span className="text-xs bg-slate-800 px-2 py-1 rounded-full text-slate-400 border border-slate-700">
+          {messages.length}
         </span>
       </div>
 
       {/* Message List */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent"
+        className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
       >
         {messages.length === 0 && (
-          <div className="text-center text-gray-600 text-sm italic mt-10">
-            Chưa có tin nhắn nào. Hãy nói "Xin chào"! 👋
+          <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-2">
+            <div className="p-3 bg-slate-800/50 rounded-full">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </div>
+            <p className="text-sm">No messages yet. Say hello! 👋</p>
           </div>
         )}
 
@@ -52,15 +87,15 @@ const ChatBox = ({ messages, onSendMessage, currentUser }: ChatBoxProps) => {
               key={index}
               className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
             >
-              <div className="flex items-baseline gap-2 mb-1">
+              <div className="flex items-baseline gap-2 mb-1 px-1">
                 <span
                   className={`text-xs font-bold ${
-                    isMe ? "text-blue-400" : "text-green-400"
+                    isMe ? "text-blue-400" : "text-emerald-400"
                   }`}
                 >
                   {msg.username}
                 </span>
-                <span className="text-[10px] text-gray-600">
+                <span className="text-[10px] text-slate-500">
                   {new Date(msg.createdAt).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -68,10 +103,10 @@ const ChatBox = ({ messages, onSendMessage, currentUser }: ChatBoxProps) => {
                 </span>
               </div>
               <div
-                className={`px-3 py-2 rounded-lg text-sm max-w-[90%] break-words ${
+                className={`px-4 py-2 rounded-2xl text-sm max-w-[90%] break-words shadow-sm ${
                   isMe
-                    ? "bg-blue-600 text-white rounded-tr-none"
-                    : "bg-gray-700 text-gray-200 rounded-tl-none"
+                    ? "bg-blue-600 text-white rounded-tr-sm"
+                    : "bg-slate-800 text-slate-200 rounded-tl-sm border border-slate-700"
                 }`}
               >
                 {msg.content}
@@ -84,22 +119,35 @@ const ChatBox = ({ messages, onSendMessage, currentUser }: ChatBoxProps) => {
       {/* Input Form */}
       <form
         onSubmit={handleSubmit}
-        className="p-3 border-t border-gray-700 bg-gray-800/50"
+        className="p-3 border-t border-slate-800 bg-slate-900"
       >
-        <div className="flex gap-2">
+        <div className="flex gap-2 relative">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Nhập tin nhắn..."
-            className="flex-1 bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+            placeholder="Type a message..."
+            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none placeholder:text-slate-600 transition-all"
           />
           <button
             type="submit"
             disabled={!input.trim()}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded font-bold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            Gửi
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
           </button>
         </div>
       </form>
