@@ -11,6 +11,7 @@ import {
   TabsContent,
 } from "../components/ui/tabs";
 import Pagination from "../components/ui/pagination";
+import CreateGameModal from "../components/create-game-modal";
 
 type GameStatus = "WAITING" | "PLAYING" | "FINISHED";
 
@@ -26,6 +27,8 @@ const LobbyPage = () => {
   const [currentTab, setCurrentTab] = useState<GameStatus>("WAITING");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Load danh sách phòng + check trạng thái bản thân
   const loadData = useCallback(async () => {
@@ -55,8 +58,7 @@ const LobbyPage = () => {
     return () => clearInterval(interval);
   }, [loadData]);
 
-  const handleCreateGame = async () => {
-    // [LOGIC MỚI] Chặn ở client
+  const handleOpenCreateModal = () => {
     if (activeGame) {
       alert(
         `Bạn đang có phòng chưa kết thúc (${activeGame.id.substring(
@@ -66,15 +68,23 @@ const LobbyPage = () => {
       );
       return;
     }
+    setShowCreateModal(true);
+  };
 
+  const handleCreateGameSubmit = async (options: {
+    timeLimitMinutes: number;
+    incrementSeconds: number;
+    side: "white" | "black" | "random";
+  }) => {
     setIsLoading(true);
     try {
-      const newGame = await gameApi.createGame();
+      const newGame = await gameApi.createGame(options);
       navigate(`/game/${newGame.id}`);
     } catch (error: any) {
       alert(error.response?.data?.message || "Lỗi tạo phòng!");
     } finally {
       setIsLoading(false);
+      setShowCreateModal(false);
     }
   };
 
@@ -271,8 +281,8 @@ const LobbyPage = () => {
             </p>
           </div>
           <button
-            onClick={handleCreateGame}
-            disabled={isLoading || !!activeGame} // [MỚI] Disable nếu đang có activeGame
+            onClick={handleOpenCreateModal}
+            disabled={isLoading || !!activeGame} // Disable nếu đang có activeGame
             className="w-full sm:w-auto px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg font-bold text-white shadow-lg shadow-green-900/50 transition-all active:scale-95 flex items-center justify-center gap-2"
           >
             {isLoading ? (
@@ -421,6 +431,13 @@ const LobbyPage = () => {
       <ProfileModal
         isOpen={showProfile}
         onClose={() => setShowProfile(false)}
+      />
+
+      <CreateGameModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateGameSubmit}
+        isLoading={isLoading}
       />
     </div>
   );

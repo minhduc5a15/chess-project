@@ -18,21 +18,44 @@ public class GameService : IGameService
     }
 
     // Core Methods (Public)
-    public async Task<GameDto> CreateGameAsync(string playerId)
+    public async Task<GameDto> CreateGameAsync(string playerId, CreateGameDto dto)
     {
         var hasActiveGame = await _gameRepository.HasActiveGameAsync(playerId);
         if (hasActiveGame)
         {
-            throw new InvalidOperationException("Bạn đang có ván cờ chưa kết thúc. Hãy hoàn thành hoặc đầu hàng trước khi tạo phòng mới.");
+            throw new InvalidOperationException("Bạn đang có ván cờ chưa kết thúc.");
         }
+
+        long totalTimeMs = dto.TimeLimitMinutes * 60 * 1000;
 
         var game = new Game
         {
             Id = Guid.NewGuid(),
-            WhitePlayerId = playerId,
             Status = "WAITING",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+
+            // Cài đặt thời gian
+            TimeLimitMinutes = dto.TimeLimitMinutes,
+            IncrementSeconds = dto.IncrementSeconds,
+            WhiteTimeRemainingMs = totalTimeMs,
+            BlackTimeRemainingMs = totalTimeMs
         };
+
+        // Xử lý chọn phe
+        if (dto.Side == "white")
+        {
+            game.WhitePlayerId = playerId;
+        }
+        else if (dto.Side == "black")
+        {
+            game.BlackPlayerId = playerId;
+        }
+        else // "random"
+        {
+            bool isWhite = Random.Shared.Next(2) == 0;
+            if (isWhite) game.WhitePlayerId = playerId;
+            else game.BlackPlayerId = playerId;
+        }
 
         await _gameRepository.AddAsync(game);
         return MapToDto(game);
@@ -50,6 +73,7 @@ public class GameService : IGameService
             if (Guid.TryParse(game.WhitePlayerId, out var wId)) playerIds.Add(wId);
             if (Guid.TryParse(game.BlackPlayerId, out var bId)) playerIds.Add(bId);
         }
+
         playerIds = playerIds.Distinct().ToList();
 
         var users = await _userRepository.GetUsersByIdsAsync(playerIds);
@@ -60,8 +84,12 @@ public class GameService : IGameService
             Id = game.Id,
             WhitePlayerId = game.WhitePlayerId,
             BlackPlayerId = game.BlackPlayerId,
-            WhiteUsername = game.WhitePlayerId != null && userDict.ContainsKey(game.WhitePlayerId) ? userDict[game.WhitePlayerId] : null,
-            BlackUsername = game.BlackPlayerId != null && userDict.ContainsKey(game.BlackPlayerId) ? userDict[game.BlackPlayerId] : null,
+            WhiteUsername = game.WhitePlayerId != null && userDict.ContainsKey(game.WhitePlayerId)
+                ? userDict[game.WhitePlayerId]
+                : null,
+            BlackUsername = game.BlackPlayerId != null && userDict.ContainsKey(game.BlackPlayerId)
+                ? userDict[game.BlackPlayerId]
+                : null,
             FEN = game.FEN,
             Status = game.Status,
             WinnerId = game.WinnerId,
@@ -139,34 +167,59 @@ public class GameService : IGameService
         return await GetGameByIdAsync(game.Id);
     }
 
-    private async Task<PaginatedResult<GameDto>> MapPagedResult(PaginatedResult<Game> pagedGames) {
+    private async Task<PaginatedResult<GameDto>> MapPagedResult(PaginatedResult<Game> pagedGames)
+    {
         var playerIds = new List<Guid>();
-        foreach (var g in pagedGames.Items) { if (Guid.TryParse(g.WhitePlayerId, out var w)) playerIds.Add(w); if (Guid.TryParse(g.BlackPlayerId, out var b)) playerIds.Add(b); }
+        foreach (var g in pagedGames.Items)
+        {
+            if (Guid.TryParse(g.WhitePlayerId, out var w)) playerIds.Add(w);
+            if (Guid.TryParse(g.BlackPlayerId, out var b)) playerIds.Add(b);
+        }
+
         playerIds = playerIds.Distinct().ToList();
         var users = await _userRepository.GetUsersByIdsAsync(playerIds);
         var userDict = users.ToDictionary(u => u.Id.ToString(), u => u.Username);
-        var dtos = pagedGames.Items.Select(g => {
+        var dtos = pagedGames.Items.Select(g =>
+        {
             var d = MapToDto(g);
-            if (d.WhitePlayerId != null && userDict.ContainsKey(d.WhitePlayerId)) d.WhiteUsername = userDict[d.WhitePlayerId];
-            if (d.BlackPlayerId != null && userDict.ContainsKey(d.BlackPlayerId)) d.BlackUsername = userDict[d.BlackPlayerId];
+            if (d.WhitePlayerId != null && userDict.ContainsKey(d.WhitePlayerId))
+                d.WhiteUsername = userDict[d.WhitePlayerId];
+            if (d.BlackPlayerId != null && userDict.ContainsKey(d.BlackPlayerId))
+                d.BlackUsername = userDict[d.BlackPlayerId];
             return d;
         }).ToList();
-        return new PaginatedResult<GameDto> { Items = dtos, TotalCount = pagedGames.TotalCount, PageIndex = pagedGames.PageIndex, PageSize = pagedGames.PageSize };
+        return new PaginatedResult<GameDto>
+        {
+            Items = dtos, TotalCount = pagedGames.TotalCount, PageIndex = pagedGames.PageIndex,
+            PageSize = pagedGames.PageSize
+        };
     }
 
     public async Task<bool> JoinGameAsync(Guid gameId, string playerId)
     {
         var game = await _gameRepository.GetByIdAsync(gameId);
 
-        if (game == null || game.Status != "WAITING" || game.WhitePlayerId == playerId)
+        // Kiểm tra cơ bản
+        if (game == null || game.Status != "WAITING") return false;
+
+        // Không cho phép tự chơi với chính mình
+        if (game.WhitePlayerId == playerId || game.BlackPlayerId == playerId) return false;
+
+        // Điền vào chỗ trống
+        if (game.WhitePlayerId == null)
         {
-            return false;
+            game.WhitePlayerId = playerId;
+        }
+        else if (game.BlackPlayerId == null)
+        {
+            game.BlackPlayerId = playerId;
+        }
+        else
+        {
+            return false; // Phòng đã đầy (dù status WAITING - trường hợp hiếm)
         }
 
-        game.BlackPlayerId = playerId;
         game.Status = "PLAYING";
-
-        // Khởi tạo thời điểm bắt đầu tính giờ
         game.LastMoveAt = DateTime.UtcNow;
 
         await _gameRepository.UpdateAsync(game);
@@ -330,7 +383,6 @@ public class GameService : IGameService
 
     private bool UpdateGameTimer(Game game, Player currentTurn)
     {
-        // Nếu chưa có nước đi nào thì chưa trừ giờ (hoặc tùy luật)
         if (!game.LastMoveAt.HasValue)
         {
             game.LastMoveAt = DateTime.UtcNow;
@@ -340,28 +392,42 @@ public class GameService : IGameService
         var now = DateTime.UtcNow;
         var elapsedMs = (long)(now - game.LastMoveAt.Value).TotalMilliseconds;
 
+        // Tính thời gian cộng thêm (chuyển sang ms)
+        long incrementMs = game.IncrementSeconds * 1000;
+
         if (currentTurn == Player.White)
         {
+            // Trừ thời gian đã suy nghĩ
             game.WhiteTimeRemainingMs -= elapsedMs;
-            if (game.WhiteTimeRemainingMs <= 0)
+
+            // Nếu còn thời gian, cộng thêm increment
+            if (game.WhiteTimeRemainingMs > 0)
+            {
+                game.WhiteTimeRemainingMs += incrementMs;
+            }
+            else
             {
                 game.WhiteTimeRemainingMs = 0;
-                SetGameResult(game, "FINISHED", game.BlackPlayerId); // Trắng hết giờ -> Đen thắng
-                return false; // Báo hiệu game kết thúc do hết giờ
+                SetGameResult(game, "FINISHED", game.BlackPlayerId);
+                return false;
             }
         }
-        else
+        else // Black
         {
             game.BlackTimeRemainingMs -= elapsedMs;
-            if (game.BlackTimeRemainingMs <= 0)
+
+            if (game.BlackTimeRemainingMs > 0)
+            {
+                game.BlackTimeRemainingMs += incrementMs;
+            }
+            else
             {
                 game.BlackTimeRemainingMs = 0;
-                SetGameResult(game, "FINISHED", game.WhitePlayerId); // Đen hết giờ -> Trắng thắng
+                SetGameResult(game, "FINISHED", game.WhitePlayerId);
                 return false;
             }
         }
 
-        // Cập nhật mốc thời gian mới
         game.LastMoveAt = now;
         return true;
     }

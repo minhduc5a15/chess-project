@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ChessProject.Application.DTOs;
 using ChessProject.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,23 +20,24 @@ public class GamesController : ControllerBase
         _chatRepository = chatRepository;
     }
 
-    // POST api/games (Tạo phòng)
+    // POST api/games
     [Authorize]
     [HttpPost]
-    public async Task<IActionResult> CreateGame()
+    public async Task<IActionResult> CreateGame([FromBody] CreateGameDto dto) // Thêm tham số dto
     {
         try
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
             if (userId == null) return Unauthorized();
 
-            // Service sẽ throw exception nếu đang có game active
-            var game = await _gameService.CreateGameAsync(userId);
+            // Validate DTO
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            var game = await _gameService.CreateGameAsync(userId, dto); // Truyền dto vào service
             return Ok(game);
         }
         catch (InvalidOperationException ex)
         {
-            // Trả về 400 BadRequest kèm thông báo lỗi
             return BadRequest(new { message = ex.Message });
         }
         catch (Exception ex)
@@ -132,6 +134,7 @@ public class GamesController : ControllerBase
         var messages = await _chatRepository.GetMessagesByGameIdAsync(id);
         return Ok(messages);
     }
+
     [Authorize]
     [HttpDelete("{id}")]
     public async Task<IActionResult> CancelGame(Guid id)

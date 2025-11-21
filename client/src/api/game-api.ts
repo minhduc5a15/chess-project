@@ -41,8 +41,18 @@ export const gameApi = {
   },
 
   // Tạo phòng mới
-  createGame: async (): Promise<Game> => {
-    const response = await apiClient.post("/games");
+  createGame: async (options?: {
+    timeLimitMinutes: number;
+    incrementSeconds: number;
+    side: "white" | "black" | "random";
+  }): Promise<Game> => {
+    // Mặc định nếu không truyền gì
+    const payload = options || {
+      timeLimitMinutes: 10,
+      incrementSeconds: 0,
+      side: "random",
+    };
+    const response = await apiClient.post("/games", payload);
     return response.data;
   },
 

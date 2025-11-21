@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { Chess, type Square, type Piece, type Move } from "chess.js";
 import BoardSquare from "./board/board-square";
