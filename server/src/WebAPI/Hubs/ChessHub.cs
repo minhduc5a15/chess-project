@@ -24,6 +24,29 @@ public class ChessHub : Hub
         await Groups.AddToGroupAsync(Context.ConnectionId, gameId);
     }
 
+    public override async Task OnConnectedAsync()
+    {
+        var userId = Context.UserIdentifier;
+        if (!string.IsNullOrEmpty(userId))
+        {
+            // Thêm connection vào group có tên là userId để có thể gửi riêng tư
+            await Groups.AddToGroupAsync(Context.ConnectionId, userId);
+        }
+
+        await base.OnConnectedAsync();
+    }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        var userId = Context.UserIdentifier;
+        if (!string.IsNullOrEmpty(userId))
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, userId);
+        }
+
+        await base.OnDisconnectedAsync(exception);
+    }
+
     public async Task LeaveGame(string gameId)
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, gameId);
@@ -80,6 +103,26 @@ public class ChessHub : Hub
             content = messageContent,
             createdAt = chatMessage.CreatedAt
         });
+    }
+
+    public async Task InvitePlayer(string gameId, string invitedPlayerId, string inviterUsername)
+    {
+        if (!Guid.TryParse(gameId, out var gId)) return;
+
+        var game = await _gameService.GetGameByIdAsync(gId);
+        if (game == null || game.Status != "WAITING") return;
+
+        // Gửi invite tới group/đương kết nối của user được mời
+        // Dùng Group có tên là invitedPlayerId (được thêm khi user connect)
+        await Clients.Group(invitedPlayerId).SendAsync("ReceiveInvite", new
+        {
+            gameId = gameId,
+            inviter = inviterUsername,
+            gameStatus = game.Status
+        });
+
+        // Thông báo cho người gửi là invite đã được gửi
+        await Clients.Caller.SendAsync("InviteSent", gameId);
     }
 
     public async Task Resign(string gameId)

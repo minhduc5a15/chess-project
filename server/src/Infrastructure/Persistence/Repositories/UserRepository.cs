@@ -20,7 +20,7 @@ public class UserRepository : IUserRepository
         await _context.SaveChangesAsync(); // save changes after adding
     }
 
-    public async Task<User> GetByUsernameAsync(string username)
+    public async Task<User?> GetByUsernameAsync(string username)
     {
         return await _context.Users.FirstOrDefaultAsync(u => u.Username == username);
     }

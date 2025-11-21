@@ -51,7 +51,7 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
   }
 
   // Chỉ cho phép thao tác nếu đúng lượt và đúng màu quân
-  const isMyTurn = game.turn() === myColor;
+  const isMyTurn = myColor !== "spectator" && game.turn() === myColor;
 
   // --- LOGIC GAME ---
 
@@ -61,13 +61,13 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
 
     try {
       const gameCopy = new Chess(game.fen());
-      const moveOptions = {from, to, promotion: promotion || 'q'};
+      const moveOptions = { from, to, promotion: promotion || 'q' };
       const moveResult = gameCopy.move(moveOptions);
 
       if (moveResult) {
         if (!promotion && moveResult.promotion) {
           setPromotionMove({ from, to });
-          return false; 
+          return false;
         }
         setGame(gameCopy);
         setLastMove({ from, to });
@@ -92,7 +92,8 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
   }
 
   function handleSquareClick(square: Square) {
-    if (!isMyTurn && myColor !== "spectator") return;
+    // Nếu là spectator hoặc không phải lượt mình thì chặn
+    if (myColor === "spectator" || !isMyTurn) return;
 
     if (promotionMove) return;
 
@@ -119,7 +120,7 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
   }
 
   function onDragStartHandler(square: Square) {
-    if (!isMyTurn) return;
+    if (myColor === "spectator" || !isMyTurn) return;
     setDraggedSquare(square);
     const moves = game.moves({ square, verbose: true }) as Move[];
     setValidMoves(moves.map((m) => m.to));
@@ -145,9 +146,8 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
   return (
     <div className="flex flex-col items-center">
       <div
-        className={`w-[600px] p-4 transition-opacity duration-300 ${
-          !isMyTurn && myColor !== "spectator" ? "opacity-90" : ""
-        }`}
+        className={`w-[600px] p-4 transition-opacity duration-300 ${!isMyTurn && myColor !== "spectator" ? "opacity-90" : ""
+          }`}
       >
         <div className="aspect-square w-full border-6 border-gray-800 rounded-sm overflow-hidden shadow-2xl bg-gray-800 grid grid-cols-8">
           {boardToRender.map((row, rowIndex) =>
@@ -195,7 +195,7 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
             })
           )}
         </div>
-        </div>
+      </div>
 
       {/* Promotion selector (simple) */}
       {promotionMove && (
@@ -266,8 +266,8 @@ const ChessBoard = ({ fen, myColor, onMove }: ChessBoardProps) => {
             {myColor === "spectator"
               ? "Xem"
               : myColor === "w"
-              ? "Trắng"
-              : "Đen"}
+                ? "Trắng"
+                : "Đen"}
           </strong>
         </div>
 

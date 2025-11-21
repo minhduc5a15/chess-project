@@ -17,6 +17,13 @@ public class GameService : IGameService
     // Core Methods (Public)
     public async Task<GameDto> CreateGameAsync(string playerId)
     {
+        // 1. Kiểm tra giới hạn 1 phòng chờ cho mỗi user
+        var existing = await _gameRepository.GetWaitingGameByCreatorIdAsync(playerId);
+        if (existing != null)
+        {
+            throw new Exception("Bạn chỉ có thể tạo tối đa 1 phòng chờ.");
+        }
+
         var game = new Game
         {
             Id = Guid.NewGuid(),
@@ -27,6 +34,31 @@ public class GameService : IGameService
 
         await _gameRepository.AddAsync(game);
         return MapToDto(game);
+    }
+
+    public async Task<GameDto?> GetWaitingGameByCreatorIdAsync(string playerId)
+    {
+        var game = await _gameRepository.GetWaitingGameByCreatorIdAsync(playerId);
+        return game == null ? null : MapToDto(game);
+    }
+
+    public async Task DeleteGameAsync(Guid id)
+    {
+        // Permanently delete the game record
+        await _gameRepository.DeleteAsync(id);
+    }
+
+    public async Task<IEnumerable<GameDto>> GetGamesByStatusAsync(string status, int page, int pageSize)
+    {
+        var games = await _gameRepository.GetGamesByStatusAsync(status, page, pageSize);
+        return games.Select(MapToDto);
+    }
+
+    public async Task<IEnumerable<GameDto>> GetGamesByUserAsync(string userId, int page, int pageSize)
+    {
+        if (!Guid.TryParse(userId, out var guid)) return Enumerable.Empty<GameDto>();
+        var games = await _gameRepository.GetGamesByUserAsync(guid, page, pageSize);
+        return games.Select(MapToDto);
     }
 
     public async Task<IEnumerable<GameDto>> GetWaitingGamesAsync()
