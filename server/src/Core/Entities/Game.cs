@@ -11,10 +11,15 @@ public class Game
     public string MoveHistory { get; set; } = "";
 
     public string Status { get; set; } = "WAITING"; // WAITING, PLAYING, FINISHED
-    
+
     public string? WinnerId { get; set; }
-    
+
+    public long WhiteTimeRemainingMs { get; set; } = 10 * 60 * 1000;
+    public long BlackTimeRemainingMs { get; set; } = 10 * 60 * 1000;
+
+    public DateTime? LastMoveAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
-    
+
     public DateTime? FinishedAt { get; set; }
 }

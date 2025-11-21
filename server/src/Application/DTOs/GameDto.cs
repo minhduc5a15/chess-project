@@ -7,5 +7,15 @@ public class GameDto
     public string? BlackPlayerId { get; set; }
     public string FEN { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
+
+    public string? WinnerId { get; set; }
+
+    public long WhiteTimeRemainingMs { get; set; }
+    public long BlackTimeRemainingMs { get; set; }
+    public DateTime? LastMoveAt { get; set; }
+
+    public string MoveHistory { get; set; } = string.Empty;
+
     public DateTime CreatedAt { get; set; }
+
 }

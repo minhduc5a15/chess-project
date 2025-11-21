@@ -28,7 +28,7 @@ Một project demo/prototype để học và triển khai các kỹ năng fullst
 
 - **Frontend:** React.js (hoặc Next.js), TypeScript, Redux / Zustand (state), React Router, Socket client.
 - **Backend:** ASP.NET Core Web API (C#), Entity Framework Core, SignalR cho realtime.
-- **Database:** PostgreSQL (hoặc MS SQL).
+- **Database:** PostgreSQL
 - **Auth & Security:** JWT (access token + refresh token), bcrypt (BCrypt.Net-Next), HTTPS.
 - **Storage:** PGN & replays lưu trong DB; avatar có thể lưu S3 / Supabase Storage.
 - **DevOps:** Có thể áp dụng nếu đủ thời gian.
