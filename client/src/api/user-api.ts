@@ -31,6 +31,16 @@ export const userApi = {
     return response.data;
   },
 
+  getByUsername: async (username: string): Promise<{ id: string; username: string } | null> => {
+    try {
+      const response = await apiClient.get(`/users/by-username/${encodeURIComponent(username)}`);
+      return response.data;
+    } catch (err: any) {
+      if (err?.response && err.response.status === 404) return null;
+      throw err;
+    }
+  },
+
   updateProfile: async (bio: string): Promise<void> => {
     await apiClient.put("/users/profile", { bio });
   },

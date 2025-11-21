@@ -9,6 +9,12 @@ export const gameApi = {
     return response.data;
   },
 
+  // Lấy games theo trạng thái, hỗ trợ phân trang
+  getGames: async (status: string, page = 1, pageSize = 10): Promise<Game[]> => {
+    const response = await apiClient.get(`/games?status=${encodeURIComponent(status)}&page=${page}&pageSize=${pageSize}`);
+    return response.data;
+  },
+
   // Tạo phòng mới
   createGame: async (): Promise<Game> => {
     const response = await apiClient.post("/games");
@@ -29,5 +35,20 @@ export const gameApi = {
   getMessages: async (gameId: string): Promise<ChatMessage[]> => {
     const response = await apiClient.get(`/games/${gameId}/messages`);
     return response.data;
+  },
+  // Lấy phòng chờ do mình tạo
+  getMyWaitingGame: async (): Promise<Game | null> => {
+    try {
+      const response = await apiClient.get("/games/my-waiting-room");
+      return response.data;
+    } catch (error: any) {
+      if (error?.response && error.response.status === 404) return null;
+      throw error;
+    }
+  },
+
+  // Hủy phòng
+  cancelGame: async (gameId: string): Promise<void> => {
+    await apiClient.delete(`/games/${gameId}`);
   },
 };

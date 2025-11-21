@@ -12,11 +12,54 @@ public class GamesController : ControllerBase
 {
     private readonly IGameService _gameService;
     private readonly IChatRepository _chatRepository;
+    private readonly IUserRepository _userRepository;
 
-    public GamesController(IGameService gameService, IChatRepository chatRepository)
+    public GamesController(IGameService gameService, IChatRepository chatRepository, IUserRepository userRepository)
     {
         _gameService = gameService;
         _chatRepository = chatRepository;
+        _userRepository = userRepository;
+    }
+
+    private async Task<IEnumerable<object>> EnrichWithUsernames(IEnumerable<ChessProject.Application.DTOs.GameDto> games)
+    {
+        var tasks = games.Select(async g =>
+        {
+            string? whiteUsername = null;
+            string? blackUsername = null;
+
+            if (!string.IsNullOrEmpty(g.WhitePlayerId) && Guid.TryParse(g.WhitePlayerId, out var w))
+            {
+                var u = await _userRepository.GetByIdAsync(w);
+                whiteUsername = u?.Username;
+            }
+
+            if (!string.IsNullOrEmpty(g.BlackPlayerId) && Guid.TryParse(g.BlackPlayerId, out var b))
+            {
+                var u = await _userRepository.GetByIdAsync(b);
+                blackUsername = u?.Username;
+            }
+
+            return new
+            {
+                g.Id,
+                g.WhitePlayerId,
+                WhiteUsername = whiteUsername,
+                g.BlackPlayerId,
+                BlackUsername = blackUsername,
+                g.FEN,
+                g.Status,
+                g.CreatedAt,
+                g.WhiteTimeRemainingMs,
+                g.BlackTimeRemainingMs,
+                g.LastMoveAt,
+                g.WinnerId,
+                g.MoveHistory
+            } as object;
+        });
+
+        var results = await Task.WhenAll(tasks);
+        return results;
     }
 
     // POST api/games (Tạo phòng)
@@ -46,11 +89,36 @@ public class GamesController : ControllerBase
     }
 
     // GET api/games/waiting (Lấy danh sách phòng chờ)
+    // Backwards-compatible: GET api/games/waiting
     [HttpGet("waiting")]
     public async Task<IActionResult> GetWaitingGames()
     {
         var games = await _gameService.GetWaitingGamesAsync();
-        return Ok(games);
+        var enriched = await EnrichWithUsernames(games);
+        return Ok(enriched);
+    }
+
+    // GET api/games?status=WAITING|PLAYING|FINISHED&page=1&pageSize=10
+    [HttpGet]
+    public async Task<IActionResult> GetGames([FromQuery] string? status, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    {
+        status = status?.ToUpper() ?? "WAITING";
+
+        if (status == "FINISHED")
+        {
+            // For finished games, return games played by current user (history)
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+            if (userId == null) return Unauthorized(new { message = "Authentication required to view finished games." });
+
+            var games = await _gameService.GetGamesByUserAsync(userId, page, pageSize);
+            var enriched = await EnrichWithUsernames(games);
+            return Ok(enriched);
+        }
+
+        // WAITING or PLAYING
+        var gamesByStatus = await _gameService.GetGamesByStatusAsync(status, page, pageSize);
+        var enrichedStatus = await EnrichWithUsernames(gamesByStatus);
+        return Ok(enrichedStatus);
     }
 
     // GET api/games/{id}
@@ -60,6 +128,55 @@ public class GamesController : ControllerBase
         var game = await _gameService.GetGameByIdAsync(id);
         if (game == null) return NotFound();
         return Ok(game);
+    }
+
+    [Authorize]
+    [HttpGet("my-waiting-room")]
+    public async Task<IActionResult> GetMyWaitingGame()
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+        if (userId == null) return Unauthorized();
+
+        var game = await _gameService.GetWaitingGameByCreatorIdAsync(userId);
+        if (game == null) return NotFound(new { message = "No waiting game found." });
+        var enriched = await EnrichWithUsernames(new[] { game });
+        return Ok(enriched.First());
+    }
+
+    [Authorize]
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> CancelGame(Guid id)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
+        if (userId == null) return Unauthorized();
+
+        var game = await _gameService.GetGameByIdAsync(id);
+
+        if (game == null || game.Status != "WAITING")
+        {
+            return NotFound(new { message = "Game not found or already started." });
+        }
+
+
+        // Strict owner check: compare GUIDs if possible, fallback to string compare
+        var isOwner = false;
+        if (!string.IsNullOrEmpty(game.WhitePlayerId) && Guid.TryParse(game.WhitePlayerId, out var creatorGuid) && Guid.TryParse(userId, out var callerGuid))
+        {
+            isOwner = creatorGuid == callerGuid;
+        }
+        else
+        {
+            isOwner = game.WhitePlayerId == userId;
+        }
+
+        if (!isOwner)
+        {
+            return Forbid();
+        }
+
+        await _gameService.DeleteGameAsync(id);
+
+        return Ok(new { message = "Game cancelled successfully" });
     }
 
     [Authorize]

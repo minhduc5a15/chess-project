@@ -5,6 +5,8 @@ export interface Game {
   fen: string;
   createdAt: string;
   status: "WAITING" | "PLAYING" | "FINISHED";
+  whiteUsername?: string | null;
+  blackUsername?: string | null;
 
   whiteTimeRemainingMs: number;
   blackTimeRemainingMs: number;

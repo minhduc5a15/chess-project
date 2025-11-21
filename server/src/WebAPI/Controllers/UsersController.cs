@@ -1,6 +1,11 @@
+using System;
+using System.IO;
+using System.Linq;
 using System.Security.Claims;
 using ChessProject.Core.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ChessProject.WebAPI.Controllers;
@@ -18,25 +23,24 @@ public class UsersController : ControllerBase
         _environment = environment;
     }
 
-    // 1. GET: api/users (Chỉ Admin được xem danh sách)
+    // 1. GET: api/users (Admin)
     [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> GetAllUsers()
     {
         var users = await _userRepository.GetAllAsync();
-        // Ẩn PasswordHash khi trả về client
         var result = users.Select(u => new
         {
             u.Id,
             u.Username,
             u.Role,
             u.AvatarUrl,
-            u.CreatedAt
+             u.CreatedAt
         });
         return Ok(result);
     }
 
-    // 2. DELETE: api/users/{id} (Chỉ Admin được xóa)
+    // 2. DELETE: api/users/{id} (Admin)
     [Authorize(Roles = "Admin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteUser(Guid id)
@@ -44,7 +48,6 @@ public class UsersController : ControllerBase
         var user = await _userRepository.GetByIdAsync(id);
         if (user == null) return NotFound(new { message = "User not found" });
 
-        // Không cho phép xóa chính mình (nếu cần)
         var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (currentUserId == id.ToString())
         {
@@ -55,7 +58,7 @@ public class UsersController : ControllerBase
         return Ok(new { message = "User deleted successfully" });
     }
 
-    // 3. POST: api/users/avatar (User tự upload avatar)
+    // 3. POST: api/users/avatar
     [Authorize]
     [HttpPost("avatar")]
     public async Task<IActionResult> UploadAvatar(IFormFile? file)
@@ -63,33 +66,27 @@ public class UsersController : ControllerBase
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "No file uploaded" });
 
-        // Validate loại file (chỉ ảnh)
         if (!file.ContentType.StartsWith("image/"))
             return BadRequest(new { message = "Only image files are allowed" });
 
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier); // Lấy ID từ Token
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId == null) return Unauthorized();
 
         var user = await _userRepository.GetByIdAsync(Guid.Parse(userId));
         if (user == null) return NotFound();
 
-        // Tạo thư mục uploads nếu chưa có: server/src/WebAPI/wwwroot/uploads
-        var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads");
+        var uploadsFolder = Path.Combine(_environment.WebRootPath ?? "wwwroot", "uploads");
         if (!Directory.Exists(uploadsFolder))
             Directory.CreateDirectory(uploadsFolder);
 
-        // Tạo tên file độc nhất
         var uniqueFileName = $"{userId}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
         var filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-        // Lưu file
         using (var stream = new FileStream(filePath, FileMode.Create))
         {
             await file.CopyToAsync(stream);
         }
 
-        // Cập nhật URL vào DB
-        // URL sẽ là: https://localhost:port/uploads/filename.jpg
         var request = HttpContext.Request;
         var baseUrl = $"{request.Scheme}://{request.Host}";
         user.AvatarUrl = $"{baseUrl}/uploads/{uniqueFileName}";
@@ -103,26 +100,20 @@ public class UsersController : ControllerBase
     [HttpPut("profile")]
     public async Task<IActionResult> UpdateProfile([FromBody] ChessProject.Application.DTOs.UpdateProfileDto dto)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier); // Lấy ID từ Token
-
-        // Fallback tìm claim "sub" nếu NameIdentifier null (đề phòng)
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId == null) userId = User.FindFirstValue("sub");
-
         if (userId == null) return Unauthorized();
 
         var user = await _userRepository.GetByIdAsync(Guid.Parse(userId));
         if (user == null) return NotFound();
 
-        // Cập nhật Bio
         user.Bio = dto.Bio;
-
-        // Lưu xuống DB
         await _userRepository.UpdateAsync(user);
 
         return Ok(new { message = "Profile updated successfully", bio = user.Bio });
     }
 
-    [Authorize]
+    // GET api/users/{username} - get profile
     [HttpGet("{username}")]
     public async Task<IActionResult> GetUserProfile(string username)
     {
@@ -138,5 +129,15 @@ public class UsersController : ControllerBase
             user.Bio,
             user.CreatedAt
         });
+    }
+
+    // GET api/users/by-username/{username} - lookup id for invite
+    [HttpGet("by-username/{username}")]
+    public async Task<IActionResult> GetByUsername(string username)
+    {
+        var user = await _userRepository.GetByUsernameAsync(username);
+        if (user == null) return NotFound();
+
+        return Ok(new { id = user.Id.ToString(), username = user.Username });
     }
 }
