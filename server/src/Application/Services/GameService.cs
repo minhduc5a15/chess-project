@@ -14,6 +14,7 @@ public class GameService : IGameService
         _gameRepository = gameRepository;
     }
 
+    // Core Methods (Public)
     public async Task<GameDto> CreateGameAsync(string playerId)
     {
         var game = new Game
@@ -59,7 +60,6 @@ public class GameService : IGameService
         return true;
     }
 
-    // === REFACTORED MAKE MOVE ===
     public async Task<bool> MakeMoveAsync(Guid gameId, string moveUCI, string playerId)
     {
         // 1. Lấy game từ DB
@@ -95,8 +95,50 @@ public class GameService : IGameService
         return true;
     }
 
-    // --- HELPER METHODS ---
+    public async Task<bool> ResignAsync(Guid gameId, string playerId)
+    {
+        var game = await _gameRepository.GetByIdAsync(gameId);
+        if (game == null || game.Status != "PLAYING") return false;
 
+        string? winnerId = null;
+        if (playerId == game.WhitePlayerId)
+        {
+            winnerId = game.BlackPlayerId; // Trắng đầu hàng -> Đen thắng
+        }
+        else if (playerId == game.BlackPlayerId)
+        {
+            winnerId = game.WhitePlayerId; // Đen đầu hàng -> Trắng thắng
+        }
+        else
+        {
+            return false; // Người gọi không phải người chơi
+        }
+
+        // Cập nhật trạng thái
+        game.Status = "FINISHED";
+        game.WinnerId = winnerId;
+        game.FinishedAt = DateTime.UtcNow;
+
+        game.MoveHistory += " (Resign)";
+
+        await _gameRepository.UpdateAsync(game);
+        return true;
+    }
+
+    public async Task<bool> DrawAsync(Guid gameId)
+    {
+        var game = await _gameRepository.GetByIdAsync(gameId);
+        if (game == null || game.Status != "PLAYING") return false;
+
+        game.Status = "FINISHED";
+        game.WinnerId = null; // Null nghĩa là Hòa
+        game.FinishedAt = DateTime.UtcNow;
+
+        await _gameRepository.UpdateAsync(game);
+        return true;
+    }
+
+    // Helper Methods (Private)
     private bool IsValidGameSession(Game? game, string playerId)
     {
         if (game == null || game.Status != "PLAYING") return false;
@@ -163,15 +205,36 @@ public class GameService : IGameService
         game.FEN = chessGame.GetFen();
         game.MoveHistory += $"{moveUCI} ";
 
-        // Kiểm tra điều kiện kết thúc game
         if (chessGame.IsCheckmated(chessGame.WhoseTurn))
         {
-            SetGameResult(game, "FINISHED", playerId); // Người vừa đi là người thắng
+            SetGameResult(game, "FINISHED", playerId);
         }
-        else if (chessGame.IsStalemated(chessGame.WhoseTurn) || chessGame.IsDraw())
+        // 2. Kiểm tra Bế tắc (Stalemate) -> Hòa
+        else if (chessGame.IsStalemated(chessGame.WhoseTurn))
         {
-            SetGameResult(game, "FINISHED", null); // Hòa
+            SetGameResult(game, "FINISHED", null);
         }
+        // 3. Kiểm tra Không đủ quân (Insufficient Material) -> Hòa
+        else if (chessGame.IsInsufficientMaterial())
+        {
+            SetGameResult(game, "FINISHED", null);
+        }
+        // 4. Kiểm tra luật 50 nước đi (50-move rule)
+        // ChessGame đọc HalfMoveClock từ FEN. Nếu >= 100 (50 nước mỗi bên) -> Hòa
+        else if (GetHalfMoveClockFromFen(game.FEN) >= 100)
+        {
+            SetGameResult(game, "FINISHED", null);
+        }
+    }
+
+    private int GetHalfMoveClockFromFen(string fen)
+    {
+        var parts = fen.Split(' ');
+        if (parts.Length >= 5 && int.TryParse(parts[4], out int halfMove))
+        {
+            return halfMove;
+        }
+        return 0;
     }
 
     private void SetGameResult(Game game, string status, string? winnerId)
@@ -198,48 +261,5 @@ public class GameService : IGameService
             WinnerId = game.WinnerId,
             MoveHistory = game.MoveHistory
         };
-    }
-
-    public async Task<bool> ResignAsync(Guid gameId, string playerId)
-    {
-        var game = await _gameRepository.GetByIdAsync(gameId);
-        if (game == null || game.Status != "PLAYING") return false;
-
-        string? winnerId = null;
-        if (playerId == game.WhitePlayerId)
-        {
-            winnerId = game.BlackPlayerId; // Trắng đầu hàng -> Đen thắng
-        }
-        else if (playerId == game.BlackPlayerId)
-        {
-            winnerId = game.WhitePlayerId; // Đen đầu hàng -> Trắng thắng
-        }
-        else
-        {
-            return false; // Người gọi không phải người chơi
-        }
-
-        // Cập nhật trạng thái
-        game.Status = "FINISHED";
-        game.WinnerId = winnerId;
-        game.FinishedAt = DateTime.UtcNow;
-
-        game.MoveHistory += " (Resign)";
-
-        await _gameRepository.UpdateAsync(game);
-        return true;
-    }
-
-    public async Task<bool> DrawAsync(Guid gameId)
-    {
-        var game = await _gameRepository.GetByIdAsync(gameId);
-        if (game == null || game.Status != "PLAYING") return false;
-
-        game.Status = "FINISHED";
-        game.WinnerId = null; // Null nghĩa là Hòa
-        game.FinishedAt = DateTime.UtcNow;
-
-        await _gameRepository.UpdateAsync(game);
-        return true;
     }
 }
